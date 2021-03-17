@@ -58,9 +58,9 @@ void loader_main(void)
                                        kernel_image->ehdr.e_entry);
 
     data.system_table = e_st;
-    data.memory_map = get_memory_map_data();
     data.framebuffer = get_framebuffer_data();
     data.acpi_rsdp = get_acpi_rsdp();
+    data.memory_map = get_memory_map_data();
 
     EFI_STATUS status = e_bs->ExitBootServices(e_image_handle,
                                                data.memory_map->key);
