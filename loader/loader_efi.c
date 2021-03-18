@@ -292,18 +292,20 @@ static struct efi_memory_map_data *get_memory_map_data(void)
 
     if (status == EFI_BUFFER_TOO_SMALL)
     {
-        status = e_bs->AllocatePool(EfiLoaderData,
-                                    mapsize + sizeof(*map),
-                                    (VOID **)&map);
+        map = efi_allocate(sizeof(*map));
     }
 
-    if (!EFI_ERROR(status))
+    if (map)
     {
         status = e_bs->GetMemoryMap(&map->size,
                                     map->data,
                                     &map->key,
                                     &map->descsize,
                                     &map->descver);
+    }
+    else
+    {
+        status = e_last_error;
     }
      
     if (EFI_ERROR(status))
@@ -317,7 +319,6 @@ static struct efi_memory_map_data *get_memory_map_data(void)
 
 static struct efi_framebuffer_data *get_framebuffer_data(void)
 {
-    EFI_STATUS status;
     struct efi_framebuffer_data *framebuffer;
 
     if (!e_graphics_output)
@@ -325,11 +326,9 @@ static struct efi_framebuffer_data *get_framebuffer_data(void)
         return NULL;
     }
 
-    status = e_bs->AllocatePool(EfiLoaderData,
-                                sizeof *framebuffer,
-                                (VOID **)&framebuffer);
+    framebuffer = efi_allocate(sizeof(*framebuffer));
 
-    if (!EFI_ERROR(status))
+    if (framebuffer)
     {
         EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *mode = e_graphics_output->Mode;
 
@@ -354,10 +353,9 @@ static struct efi_framebuffer_data *get_framebuffer_data(void)
 
         framebuffer->pitch = framebuffer->width * framebuffer->pixel_size;
     }
-
     else
     {
-        Print(L"failed getting framebuffer data: %r\r\n", status);
+        Print(L"failed getting framebuffer data: %r\r\n", e_last_error);
         return NULL;
     }
 
