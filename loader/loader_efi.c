@@ -22,7 +22,6 @@ struct system_image
     Elf64_Phdr *phdrs;
 };
 
-static struct system_buffer get_system_buffer(size_t size);
 static struct system_image *open_system_image(CHAR16 *path);
 static bool load_system_image(struct system_image *image);
 static struct efi_memory_map_data *get_memory_map_data(void);
@@ -34,6 +33,8 @@ void loader_main(void)
     struct efi_boot_data data;
 
     struct system_image *kernel_image = open_system_image(kernel_path);
+
+    Print(L"loading %s\r\n", kernel_path);
 
     if (load_system_image(kernel_image))
     {
@@ -68,26 +69,6 @@ void loader_main(void)
     kernel_entry(&data);
 }
 
-static struct system_buffer get_system_buffer(UINTN size)
-{
-    EFI_STATUS status;
-    struct system_buffer buffer;
-
-    status = e_bs->AllocatePages(AllocateAnyPages,
-                                 SystemMemoryType,
-                                 EFI_SIZE_TO_PAGES(size),
-                                 &buffer.base);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"error allocating system buffer: %r\r\n", status);
-        buffer.base = 0;
-        buffer.size = 0;
-    }
-
-    return buffer;
-}
-
 static bool validate_image(Elf64_Ehdr *ehdr)
 {
     if (ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
@@ -106,29 +87,6 @@ static bool validate_image(Elf64_Ehdr *ehdr)
     Print(L"elf x64 image detected\r\n");
 
     return true;
-}
-
-static UINTN get_image_size(struct system_image *image)
-{
-    UINTN size = 0;
-    Elf64_Phdr *phdrs = image->phdrs;
-
-    for (int i = 0; i < image->ehdr.e_phnum; i++)
-    {
-        if (phdrs[i].p_type != PT_LOAD)
-        {
-            continue;
-        }
-
-        if (phdrs[i].p_paddr + phdrs[i].p_memsz > size)
-        {
-            size = phdrs[i].p_paddr + phdrs[i].p_memsz;
-            if (phdrs[i].p_align > 1)
-            size = (size + phdrs[i].p_align - 1) & ~(phdrs[i].p_align - 1);
-        }
-    }
-
-    return size;
 }
 
 static struct system_image *open_system_image(CHAR16 *path)
@@ -203,6 +161,55 @@ failure:
     return NULL;
 }
 
+static struct system_buffer get_system_buffer(UINTN size)
+{
+    EFI_STATUS status;
+    struct system_buffer buffer;
+
+    buffer.size = size;
+
+    status = e_bs->AllocatePages(AllocateAnyPages,
+                                 SystemMemoryType,
+                                 EFI_SIZE_TO_PAGES(buffer.size),
+                                 &buffer.base);
+
+    if (EFI_ERROR(status))
+    {
+        Print(L"error allocating system buffer: %r\r\n", status);
+        buffer.base = 0;
+        buffer.size = 0;
+    }
+
+    Print(L"allocated system buffer at %16.0x of %d bytes\r\n",
+          buffer.base,
+          buffer.size);
+
+    return buffer;
+}
+
+static UINTN get_image_size(struct system_image *image)
+{
+    UINTN size = 0;
+    Elf64_Phdr *phdrs = image->phdrs;
+
+    for (int i = 0; i < image->ehdr.e_phnum; i++)
+    {
+        if (phdrs[i].p_type != PT_LOAD)
+        {
+            continue;
+        }
+
+        if (phdrs[i].p_paddr + phdrs[i].p_memsz > size)
+        {
+            size = phdrs[i].p_paddr + phdrs[i].p_memsz;
+            if (phdrs[i].p_align > 1)
+            size = (size + phdrs[i].p_align - 1) & ~(phdrs[i].p_align - 1);
+        }
+    }
+
+    return size;
+}
+
 static bool load_system_image(struct system_image *image)
 {
     image->buffer = get_system_buffer(get_image_size(image));
@@ -249,7 +256,6 @@ static bool load_system_image(struct system_image *image)
 
     return true;
 }
-
 
 static struct efi_memory_map_data *get_memory_map_data(void)
 {
