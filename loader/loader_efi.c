@@ -78,7 +78,7 @@ static void map_page(void *map,
     if (!this_map[page_table_index(virt, 4)])
     {
         next_map = new_page_table();
-        this_map[page_table_index(virt, 4)] = next_map | 1;
+        this_map[page_table_index(virt, 4)] = next_map | 3;
         this_map = (uint64_t *)next_map;
     }
     else
@@ -91,7 +91,7 @@ static void map_page(void *map,
     if (!this_map[page_table_index(virt, 3)])
     {
         next_map = new_page_table();
-        this_map[page_table_index(virt, 3)] = next_map | 1;
+        this_map[page_table_index(virt, 3)] = next_map | 3;
         this_map = (uint64_t *)next_map;
     }
     else
@@ -104,7 +104,7 @@ static void map_page(void *map,
     if (!this_map[page_table_index(virt, 2)])
     {
         next_map = new_page_table();
-        this_map[page_table_index(virt, 2)] = next_map | 1;
+        this_map[page_table_index(virt, 2)] = next_map | 3;
         this_map = (uint64_t *)next_map;
     }
     else
