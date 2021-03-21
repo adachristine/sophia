@@ -20,6 +20,7 @@ struct system_image
     EFI_FILE_PROTOCOL *file;
     Elf64_Ehdr ehdr;
     Elf64_Phdr *phdrs;
+    uint64_t *maps;
 };
 
 static struct system_image *open_system_image(CHAR16 *path);
@@ -28,29 +29,155 @@ static struct efi_memory_map_data *get_memory_map_data(void);
 static struct efi_framebuffer_data *get_framebuffer_data(void);
 static void *get_acpi_rsdp(void);
 
-void loader_main(void)
+enum page_type
 {
-    struct efi_boot_data data;
+    INVALID_PAGE_TYPE = 0x0,
+    CODE_PAGE_TYPE = 0x1,
+    RODATA_PAGE_TYPE = 0x1,
+    DATA_PAGE_TYPE = 0x3
+};
 
-    struct system_image *kernel_image = open_system_image(kernel_path);
+#define PAGE_MAP_LEVELS 4
+#define PAGE_MAP_BITS 9
+#define PAGE_OFFSET_BITS 12
 
-    Print(L"loading %s\r\n", kernel_path);
+#define PAGE_TABLE_INDEX_MASK ((1 << PAGE_MAP_BITS) - 1)
+#define PAGE_TABLE_ADDRESS_MASK ~((1 << PAGE_OFFSET_BITS) - 1)
 
-    if (load_system_image(kernel_image))
+#define page_table_index(v, l) ((v >> ((PAGE_OFFSET_BITS + (l - 1) * PAGE_MAP_BITS))) & PAGE_TABLE_INDEX_MASK)
+
+static uint64_t new_page_table(void)
+{
+    EFI_STATUS status;
+    uint64_t table_address;
+
+    status = e_bs->AllocatePages(AllocateAnyPages,
+                                 SystemMemoryType,
+                                 1,
+                                 &table_address);
+
+    if (EFI_ERROR(status))
     {
-        Print(L"loaded kernel image at base %16.0x size %d bytes\r\n",
-              kernel_image->buffer.base,
-              kernel_image->buffer.size);
+        Print(L"fatal: failed allocating page table: %r", status);
+        efi_exit(status);
+    }
+
+    e_bs->SetMem((void *)table_address, EFI_PAGE_SIZE, 0);
+
+    return table_address;
+}
+
+static void map_page(void *map,
+                     uint64_t virt,
+                     uint64_t phys,
+                     enum page_type type)
+{
+    uint64_t *this_map = (uint64_t *)map;
+    uint64_t next_map;
+    
+    if (!this_map[page_table_index(virt, 4)])
+    {
+        next_map = new_page_table();
+        this_map[page_table_index(virt, 4)] = next_map | 1;
+        this_map = (uint64_t *)next_map;
     }
     else
     {
-        Print(L"failed loading kernel image\r\n");
-        efi_exit(EFI_ABORTED);
+        next_map = this_map[page_table_index(virt, 4)];
+        next_map &= PAGE_TABLE_ADDRESS_MASK;
+        this_map = (uint64_t *)next_map;
     }
 
+    if (!this_map[page_table_index(virt, 3)])
+    {
+        next_map = new_page_table();
+        this_map[page_table_index(virt, 3)] = next_map | 1;
+        this_map = (uint64_t *)next_map;
+    }
+    else
+    {
+        next_map = this_map[page_table_index(virt, 3)];
+        next_map &= PAGE_TABLE_ADDRESS_MASK;
+        this_map = (uint64_t *)next_map;
+    }
+    
+    if (!this_map[page_table_index(virt, 2)])
+    {
+        next_map = new_page_table();
+        this_map[page_table_index(virt, 2)] = next_map | 1;
+        this_map = (uint64_t *)next_map;
+    }
+    else
+    {
+        next_map = this_map[page_table_index(virt, 2)];
+        next_map &= PAGE_TABLE_ADDRESS_MASK;
+        this_map = (uint64_t *)next_map;
+    }
+
+    this_map[page_table_index(virt, 1)] = phys | type;
+}
+
+enum page_type get_page_type(Elf64_Phdr *phdr)
+{
+    switch (phdr->p_flags)
+    {
+        case (PF_R|PF_X):
+            return CODE_PAGE_TYPE;
+        case (PF_R):
+            return RODATA_PAGE_TYPE;
+        case (PF_R|PF_W):
+            return DATA_PAGE_TYPE;
+    }
+
+    return INVALID_PAGE_TYPE;
+}
+
+static void map_pages(void *map,
+                      uint64_t virt,
+                      uint64_t phys,
+                      enum page_type type,
+                      size_t size)
+{
+    for (size_t offset = 0; offset < size; offset += EFI_PAGE_SIZE)
+    {
+        map_page(map, virt + offset, phys + offset, type);
+    }
+}
+
+static void create_kernel_maps(struct system_image *image)
+{
+    Elf64_Ehdr *ehdr = &image->ehdr;
+    Elf64_Phdr *phdrs = image->phdrs;
+
+    for (int i = 0; i < ehdr->e_phnum; i++)
+    {
+        if (phdrs[i].p_type != PT_LOAD)
+        {
+            continue;
+        }
+        else
+        {
+            uint64_t virt_begin = phdrs[i].p_vaddr;
+            uint64_t phys_begin = image->buffer.base + phdrs[i].p_paddr;
+            size_t size = phdrs[i].p_memsz;
+            Print(L"mapping segment %16.0lx to %16.0lx %d bytes\r\n",
+                  virt_begin,
+                  phys_begin,
+                  size);
+            map_pages(image->maps,
+                      virt_begin,
+                      phys_begin,
+                      get_page_type(&phdrs[i]),
+                      size);
+        }
+    }
+}
+
+static void enter_kernel(struct system_image *kernel_image)
+{
+    struct efi_boot_data data;
     kernel_entry_func kernel_entry;
-    kernel_entry = (kernel_entry_func)(kernel_image->buffer.base +
-                                       kernel_image->ehdr.e_entry);
+    kernel_entry = (kernel_entry_func)(kernel_image->ehdr.e_entry);
 
     data.system_table = e_st;
     data.framebuffer = get_framebuffer_data();
@@ -66,7 +193,48 @@ void loader_main(void)
         efi_exit(status);
     }
 
+    uint64_t *efi_maps;
+    uint64_t efi_maps_raw;
+
+    __asm__ ("mov %%cr3, %0" : "=r"(efi_maps_raw));
+    efi_maps_raw &= PAGE_TABLE_ADDRESS_MASK;
+    efi_maps = (uint64_t *)efi_maps_raw;
+
+    ((uint64_t *)kernel_image->maps)[0] = efi_maps[0];
+
+    __asm__ (
+            "cli\n\t"
+            "mov %0, %%cr3" :: "r"(kernel_image->maps)
+            );
+
     kernel_entry(&data);
+}
+
+void loader_main(void)
+{
+
+    struct system_image *kernel_image = open_system_image(kernel_path);
+
+    Print(L"loading %s\r\n", kernel_path);
+
+    if (load_system_image(kernel_image))
+    {
+        Print(L"loaded kernel image at base %16.0lx size %d bytes\r\n",
+              kernel_image->buffer.base,
+              kernel_image->buffer.size);
+    }
+    else
+    {
+        Print(L"failed loading kernel image\r\n");
+        efi_exit(EFI_ABORTED);
+    }
+    
+    kernel_image->maps = (void *)new_page_table();
+    create_kernel_maps(kernel_image);
+    Print(L"kernel maps created. entering kernel\r\n");
+    enter_kernel(kernel_image);
+
+    efi_exit(EFI_ABORTED);
 }
 
 static bool validate_image(Elf64_Ehdr *ehdr)
@@ -180,7 +348,7 @@ static struct system_buffer get_system_buffer(UINTN size)
         buffer.size = 0;
     }
 
-    Print(L"allocated system buffer at %16.0x of %d bytes\r\n",
+    Print(L"allocated system buffer at %16.0lx of %d bytes\r\n",
           buffer.base,
           buffer.size);
 
@@ -233,7 +401,8 @@ static bool load_system_image(struct system_image *image)
         switch (phdrs[i].p_type)
         {
             case PT_LOAD:
-                Print(L"loadable segment at offset %x of %d bytes\r\n",
+                Print(L"loadable segment %16.0lx at offset %x of %d bytes\r\n",
+                      phdrs[i].p_vaddr,
                       phdrs[i].p_offset,
                       phdrs[i].p_memsz);
 
@@ -345,7 +514,7 @@ static void *get_acpi_rsdp(void)
     {
         if (!CompareGuid(&acpi_20_guid, &e_st->ConfigurationTable[i].VendorGuid))
         {
-            Print(L"acpi rsdp: 0x%16.0x\r\n",
+            Print(L"acpi rsdp: 0x%16.0lx\r\n",
                   e_st->ConfigurationTable[i].VendorTable);
             
             return e_st->ConfigurationTable[i].VendorTable;

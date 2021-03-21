@@ -1,15 +1,16 @@
 ENTRY(kernel_entry)
 
+k_virt_base = 0xffffffff80000000;
+
 SECTIONS
 {
-    . = SIZEOF_HEADERS;
-
-    .text 0 :
+    .text k_virt_base : AT(ADDR(.text) - k_virt_base)
     {
         *(.text)
+        . = ALIGN(4K);
     } =0x90
 
-    .data : ALIGN(4K)
+    .data ALIGN(4K) : AT(ADDR(.data) - k_virt_base)
     {
         *(.rodata)
         *(.data)
