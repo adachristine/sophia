@@ -16,7 +16,7 @@ LDFLAGS += -z max-page-size=4096 --export-dynamic
 LOADLIBES := -lgcc
 
 SOBJS := 
-GOBJS := entry_efi.o
+GOBJS := entry_efi.o kprint.o serial.o port.o main.o
 IOBJS :=
 
 $(SOBJS): CFLAGS += -fPIC
