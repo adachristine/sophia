@@ -74,44 +74,21 @@ static void map_page(void *map,
 {
     uint64_t *this_map = (uint64_t *)map;
     uint64_t next_map;
-    
-    if (!this_map[page_table_index(virt, 4)])
-    {
-        next_map = new_page_table();
-        this_map[page_table_index(virt, 4)] = next_map | 3;
-        this_map = (uint64_t *)next_map;
-    }
-    else
-    {
-        next_map = this_map[page_table_index(virt, 4)];
-        next_map &= PAGE_TABLE_ADDRESS_MASK;
-        this_map = (uint64_t *)next_map;
-    }
 
-    if (!this_map[page_table_index(virt, 3)])
+    for (int level = 4; level > 1; level--)
     {
-        next_map = new_page_table();
-        this_map[page_table_index(virt, 3)] = next_map | 3;
-        this_map = (uint64_t *)next_map;
-    }
-    else
-    {
-        next_map = this_map[page_table_index(virt, 3)];
-        next_map &= PAGE_TABLE_ADDRESS_MASK;
-        this_map = (uint64_t *)next_map;
-    }
-    
-    if (!this_map[page_table_index(virt, 2)])
-    {
-        next_map = new_page_table();
-        this_map[page_table_index(virt, 2)] = next_map | 3;
-        this_map = (uint64_t *)next_map;
-    }
-    else
-    {
-        next_map = this_map[page_table_index(virt, 2)];
-        next_map &= PAGE_TABLE_ADDRESS_MASK;
-        this_map = (uint64_t *)next_map;
+        if (!this_map[page_table_index(virt, level)])
+        {
+            next_map = new_page_table();
+            this_map[page_table_index(virt, level)] = next_map | 3;
+            this_map = (uint64_t *)next_map;
+        }
+        else
+        {
+            next_map = this_map[page_table_index(virt, level)];
+            next_map &= PAGE_TABLE_ADDRESS_MASK;
+            this_map = (uint64_t *)next_map;
+        }
     }
 
     this_map[page_table_index(virt, 1)] = phys | type;
