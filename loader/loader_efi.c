@@ -153,11 +153,51 @@ static void create_kernel_maps(struct system_image *image)
     }
 }
 
+static struct system_buffer get_system_buffer(UINTN size)
+{
+    EFI_STATUS status;
+    struct system_buffer buffer;
+
+    buffer.size = size;
+
+    status = e_bs->AllocatePages(AllocateAnyPages,
+                                 SystemMemoryType,
+                                 EFI_SIZE_TO_PAGES(buffer.size),
+                                 &buffer.base);
+
+    if (EFI_ERROR(status))
+    {
+        Print(L"error allocating system buffer: %r\r\n", status);
+        buffer.base = 0;
+        buffer.size = 0;
+    }
+
+    Print(L"allocated system buffer at %16.0lx of %d bytes\r\n",
+          buffer.base,
+          buffer.size);
+
+    return buffer;
+}
+
+#define KERNEL_ENTRY_STACK_SIZE 0x10000
+#define KERNEL_ENTRY_STACK_BASE (uint64_t)-KERNEL_ENTRY_STACK_SIZE
+#define KERNEL_ENTRY_STACK_HEAD 0
+
 static void enter_kernel(struct system_image *kernel_image)
 {
     struct efi_boot_data data;
     kernel_entry_func kernel_entry;
     kernel_entry = (kernel_entry_func)(kernel_image->ehdr.e_entry);
+
+    struct system_buffer kernel_entry_stack =
+        get_system_buffer(KERNEL_ENTRY_STACK_SIZE);
+
+    // get a stack here for now idfk
+    map_pages(kernel_image->maps,
+              KERNEL_ENTRY_STACK_BASE,
+              kernel_entry_stack.base,
+              DATA_PAGE_TYPE,
+              kernel_entry_stack.size);
 
     data.system_table = e_st;
     data.framebuffer = get_framebuffer_data();
@@ -184,7 +224,10 @@ static void enter_kernel(struct system_image *kernel_image)
 
     __asm__ (
             "cli\n\t"
-            "mov %0, %%cr3" :: "r"(kernel_image->maps)
+            "mov %0, %%cr3\n\t"
+            "mov %1, %%rsp"
+            :: "r"(kernel_image->maps),
+               "r"((uint64_t)KERNEL_ENTRY_STACK_HEAD)
             );
 
     kernel_entry(&data);
@@ -308,32 +351,6 @@ static struct system_image *open_system_image(CHAR16 *path)
 failure:
     file->Close(file);
     return NULL;
-}
-
-static struct system_buffer get_system_buffer(UINTN size)
-{
-    EFI_STATUS status;
-    struct system_buffer buffer;
-
-    buffer.size = size;
-
-    status = e_bs->AllocatePages(AllocateAnyPages,
-                                 SystemMemoryType,
-                                 EFI_SIZE_TO_PAGES(buffer.size),
-                                 &buffer.base);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"error allocating system buffer: %r\r\n", status);
-        buffer.base = 0;
-        buffer.size = 0;
-    }
-
-    Print(L"allocated system buffer at %16.0lx of %d bytes\r\n",
-          buffer.base,
-          buffer.size);
-
-    return buffer;
 }
 
 static UINTN get_image_size(struct system_image *image)
