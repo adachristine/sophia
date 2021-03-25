@@ -37,15 +37,6 @@ enum page_type
     DATA_PAGE_TYPE = 0x3
 };
 
-#define PAGE_MAP_LEVELS 4
-#define PAGE_MAP_BITS 9
-#define PAGE_OFFSET_BITS 12
-
-#define PAGE_TABLE_INDEX_MASK ((1 << PAGE_MAP_BITS) - 1)
-#define PAGE_TABLE_ADDRESS_MASK ~((1 << PAGE_OFFSET_BITS) - 1)
-
-#define page_table_index(v, l) ((v >> ((PAGE_OFFSET_BITS + (l - 1) * PAGE_MAP_BITS))) & PAGE_TABLE_INDEX_MASK)
-
 static uint64_t new_page_table(void)
 {
     EFI_STATUS status;
@@ -67,31 +58,46 @@ static uint64_t new_page_table(void)
     return table_address;
 }
 
+#define PAGE_MAP_LEVELS 4
+#define PAGE_MAP_BITS 9
+#define PAGE_OFFSET_BITS 12
+
+#define PAGE_TABLE_INDEX_MASK ((1 << PAGE_MAP_BITS) - 1)
+#define PAGE_TABLE_ADDRESS_MASK ~((1 << PAGE_OFFSET_BITS) - 1)
+
+#define page_table_index_bits(l) (PAGE_OFFSET_BITS + PAGE_MAP_BITS * (l - 1))
+#define page_table_index(v, l) ((v >> page_table_index_bits(l)) & PAGE_TABLE_INDEX_MASK)
+
+
+static uint64_t *get_pte(uint64_t *map, uint64_t virt)
+{
+    uint64_t next_map;
+
+    for (int level = PAGE_MAP_LEVELS; level > 1; level--)
+    {
+        if (!map[page_table_index(virt, level)])
+        {
+            next_map = new_page_table();
+            map[page_table_index(virt, level)] = next_map | 3;
+            map = (uint64_t *)next_map;
+        }
+        else
+        {
+            next_map = map[page_table_index(virt, level)];
+            next_map &= PAGE_TABLE_ADDRESS_MASK;
+            map = (uint64_t *)next_map;
+        }
+    }
+
+    return &map[page_table_index(virt, 1)];
+}
+
 static void map_page(void *map,
                      uint64_t virt,
                      uint64_t phys,
                      enum page_type type)
 {
-    uint64_t *this_map = (uint64_t *)map;
-    uint64_t next_map;
-
-    for (int level = 4; level > 1; level--)
-    {
-        if (!this_map[page_table_index(virt, level)])
-        {
-            next_map = new_page_table();
-            this_map[page_table_index(virt, level)] = next_map | 3;
-            this_map = (uint64_t *)next_map;
-        }
-        else
-        {
-            next_map = this_map[page_table_index(virt, level)];
-            next_map &= PAGE_TABLE_ADDRESS_MASK;
-            this_map = (uint64_t *)next_map;
-        }
-    }
-
-    this_map[page_table_index(virt, 1)] = phys | type;
+    *get_pte(map, virt) = phys | type;
 }
 
 enum page_type get_page_type(Elf64_Phdr *phdr)
@@ -117,6 +123,7 @@ static void map_pages(void *map,
 {
     for (size_t offset = 0; offset < size; offset += EFI_PAGE_SIZE)
     {
+        Print(L"mapping page %16.0lx to %16.0lx\r\n", virt + offset, phys + offset);
         map_page(map, virt + offset, phys + offset, type);
     }
 }
@@ -128,11 +135,7 @@ static void create_kernel_maps(struct system_image *image)
 
     for (int i = 0; i < ehdr->e_phnum; i++)
     {
-        if (phdrs[i].p_type != PT_LOAD)
-        {
-            continue;
-        }
-        else
+        if (phdrs[i].p_type == PT_LOAD)
         {
             uint64_t virt_begin = phdrs[i].p_vaddr;
             uint64_t phys_begin = image->buffer.base + phdrs[i].p_paddr;
@@ -207,6 +210,7 @@ void loader_main(void)
     }
     
     kernel_image->maps = (void *)new_page_table();
+    Print(L"kernel pml4 %16.0lx\r\n", kernel_image->maps);
     create_kernel_maps(kernel_image);
     Print(L"kernel maps created. entering kernel\r\n");
     enter_kernel(kernel_image);
