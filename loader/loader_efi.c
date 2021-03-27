@@ -1,6 +1,8 @@
 #include "loader_efi.h"
 
 #include <boot/entry/entry_efi.h>
+#include <kernel/memory/paging.h>
+
 #include <elf/elf64.h>
 
 #include <stdbool.h>
@@ -58,19 +60,6 @@ static uint64_t *new_page_table(void)
     return (uint64_t *)table_address;
 }
 
-#define PAGE_PRESENT 1
-#define PAGE_WRITE 2
-
-#define PAGE_MAP_LEVELS 4
-#define PAGE_MAP_BITS 9
-#define PAGE_OFFSET_BITS 12
-
-#define PAGE_TABLE_INDEX_MASK ((1 << PAGE_MAP_BITS) - 1)
-#define PAGE_TABLE_ADDRESS_MASK ~((1 << PAGE_OFFSET_BITS) - 1)
-
-#define page_table_index_bits(l) (PAGE_OFFSET_BITS + PAGE_MAP_BITS * (l - 1))
-#define page_table_index(v, l) ((v >> page_table_index_bits(l)) & PAGE_TABLE_INDEX_MASK)
-
 static uint64_t *get_page_map(void)
 {
     uint64_t map;
@@ -97,7 +86,7 @@ static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
         {
             uint64_t *next_map = new_page_table();
             map[page_table_index(virt, i)] =
-                (uint64_t)next_map|PAGE_PRESENT|PAGE_WRITE;
+                (uint64_t)next_map|PAGE_PR|PAGE_WR;
             map = next_map;
         }
         else
@@ -191,9 +180,9 @@ static void create_kernel_maps(struct system_image *image)
                                               2);
 
     upper_page_dir[PAGE_TABLE_INDEX_MASK] =
-        (uint64_t)upper_page_dir|PAGE_PRESENT|PAGE_WRITE;
+        (uint64_t)upper_page_dir|PAGE_PR|PAGE_WR;
     upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
-        (uint64_t)lower_page_dir|PAGE_PRESENT|PAGE_WRITE;
+        (uint64_t)lower_page_dir|PAGE_PR|PAGE_WR;
 
 }
 
