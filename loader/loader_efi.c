@@ -80,29 +80,42 @@ static uint64_t *get_page_map(void)
 
 void set_page_map(uint64_t *map)
 {
+    __asm__("cli");
     __asm__("mov %0, %%cr3" :: "r"(map));
 }
 
-static uint64_t *get_page_entry(uint64_t *map, uint64_t virt)
+static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
 {
-    for (int level = PAGE_MAP_LEVELS; level > 1; level--)
+    if ((level < 1) || (level > PAGE_MAP_LEVELS))
     {
-        if (!map[page_table_index(virt, level)])
+        return NULL;
+    }
+
+    for (int i = PAGE_MAP_LEVELS; i > level; i--)
+    {
+        if (!map[page_table_index(virt, i)])
         {
             uint64_t *next_map = new_page_table();
-            map[page_table_index(virt, level)] =
+            map[page_table_index(virt, i)] =
                 (uint64_t)next_map|PAGE_PRESENT|PAGE_WRITE;
             map = next_map;
         }
         else
         {
-            uint64_t next_map_entry = map[page_table_index(virt, level)];
+            uint64_t next_map_entry = map[page_table_index(virt, i)];
             next_map_entry &= PAGE_TABLE_ADDRESS_MASK;
             map = (uint64_t *)next_map_entry;
         }
     }
 
-    return &map[page_table_index(virt, 1)];
+    return map;
+}
+
+static uint64_t *get_page_entry(uint64_t *map, uint64_t virt)
+{
+    int level = 1;
+    uint64_t *table = get_page_table(map, virt, level);
+    return &table[page_table_index(virt, level)];
 }
 
 static void map_page(void *map,
@@ -141,6 +154,9 @@ static void map_pages(void *map,
     }
 }
 
+#define KERNEL_SPACE_LOWER 0xffffffff80000000
+#define KERNEL_SPACE_UPPER 0xffffffffc0000000
+
 static void create_kernel_maps(struct system_image *image)
 {
     Elf64_Ehdr *ehdr = &image->ehdr;
@@ -164,6 +180,21 @@ static void create_kernel_maps(struct system_image *image)
                       size);
         }
     }
+
+
+    // Create fractal mappings
+    uint64_t *lower_page_dir = get_page_table(image->maps,
+                                              KERNEL_SPACE_LOWER,
+                                              2);
+    uint64_t *upper_page_dir = get_page_table(image->maps,
+                                              KERNEL_SPACE_UPPER,
+                                              2);
+
+    upper_page_dir[PAGE_TABLE_INDEX_MASK] =
+        (uint64_t)upper_page_dir|PAGE_PRESENT|PAGE_WRITE;
+    upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
+        (uint64_t)lower_page_dir|PAGE_PRESENT|PAGE_WRITE;
+
 }
 
 static struct system_buffer get_system_buffer(UINTN size)
@@ -193,14 +224,15 @@ static struct system_buffer get_system_buffer(UINTN size)
 }
 
 #define KERNEL_ENTRY_STACK_SIZE 0x10000
-#define KERNEL_ENTRY_STACK_BASE (uint64_t)-KERNEL_ENTRY_STACK_SIZE
-#define KERNEL_ENTRY_STACK_HEAD 0
+#define KERNEL_ENTRY_STACK_HEAD 0xffffffffffc00000
+#define KERNEL_ENTRY_STACK_BASE (KERNEL_ENTRY_STACK_HEAD - KERNEL_ENTRY_STACK_SIZE)
 
 static void enter_kernel(struct system_image *kernel_image)
 {
     struct efi_boot_data data;
     kernel_entry_func kernel_entry;
     kernel_entry = (kernel_entry_func)(kernel_image->ehdr.e_entry);
+
 
     struct system_buffer kernel_entry_stack =
         get_system_buffer(KERNEL_ENTRY_STACK_SIZE);
@@ -211,6 +243,7 @@ static void enter_kernel(struct system_image *kernel_image)
               kernel_entry_stack.base,
               DATA_PAGE_TYPE,
               kernel_entry_stack.size);
+
 
     data.system_table = e_st;
     data.framebuffer = get_framebuffer_data();
@@ -226,6 +259,7 @@ static void enter_kernel(struct system_image *kernel_image)
         efi_exit(status);
     }
 
+    // parasitic map of uefi page tables is this ok???????
     uint64_t *efi_map = get_page_map();
     kernel_image->maps[0] = efi_map[0];
 
