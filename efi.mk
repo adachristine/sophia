@@ -40,7 +40,7 @@ LINK._efi.so = $(LD) $(LDFLAGS) -znocombreloc -Bsymbolic -shared --no-undefined 
 
 %.efi: %_efi.so
 	$(OBJCOPY.info)
-	$(OBJCOPY.efi)
+	@$(OBJCOPY.efi)
 
 %.debug.efi: %_efi.so
 	$(OBJCOPY.info)
@@ -48,5 +48,5 @@ LINK._efi.so = $(LD) $(LDFLAGS) -znocombreloc -Bsymbolic -shared --no-undefined 
 
 %_efi.so: $(EFILDSCRIPT) $(EFICRT)
 	$(LINK.info)
-	$(LINK._efi.so)
+	@$(LINK._efi.so)
 

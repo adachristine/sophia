@@ -19,15 +19,15 @@ COMPILE.info = $(info $$(CC) $@)
 
 %.debug.os: %.os
 	$(OBJCOPY) --only-keep-debug $< $@
-	$(OBJCOPY) --strip-debug $<
+	@$(OBJCOPY) --strip-debug $<
 
 %.o: %.c
 	$(COMPILE.info)
-	$(COMPILE.c) -MMD -MP
+	@$(COMPILE.c) -MMD -MP
 
 %.o: %.cpp
 	$(COMPILE.info)
-	$(COMPILE.cpp) -MMD -MP
+	@$(COMPILE.cpp) -MMD -MP
 
 clean:
 	$(info $$(RM) $(CLEANLIST))

@@ -1,5 +1,7 @@
 include ../defaults.mk
 
+VPATH := ../lib
+
 TARGET := kernel.os
 .DEFAULT: $(TARGET)
 

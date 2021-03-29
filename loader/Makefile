@@ -1,6 +1,8 @@
 include ../defaults.mk
 include ../efi.mk
 
+VPATH := ../lib
+
 IMAGE := loader.efi
 BUILD := $(IMAGE) $(IMAGE:.efi=.debug.efi)
 
@@ -8,7 +10,7 @@ CPPFLAGS += -I../api
 
 all: $(BUILD)
 
-OBJS := entry_efi.o loader_efi.o memory_efi.o
+OBJS := entry_efi.o loader_efi.o memory_efi.o memcmp.o memmove.o
 DEPS := $(OBJS:.o=.d)
 
 IMAGE_SO := $(IMAGE:.efi=_efi.so)
