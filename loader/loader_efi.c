@@ -34,9 +34,9 @@ static void *get_acpi_rsdp(void);
 enum page_type
 {
     INVALID_PAGE_TYPE = 0x0,
-    CODE_PAGE_TYPE = 0x1,
-    RODATA_PAGE_TYPE = 0x1,
-    DATA_PAGE_TYPE = 0x3
+    CODE_PAGE_TYPE = PAGE_PR,
+    RODATA_PAGE_TYPE = PAGE_PR|PAGE_NX,
+    DATA_PAGE_TYPE = PAGE_PR|PAGE_WR|PAGE_NX
 };
 
 static uint64_t *new_page_table(void)
@@ -64,7 +64,7 @@ static uint64_t *get_page_map(void)
 {
     uint64_t map;
     __asm__("mov %%cr3, %0" : "=r"(map));
-    return (uint64_t *)(map & PAGE_TABLE_ADDRESS_MASK);
+    return (uint64_t *)(map & PAGE_ADDRESS_MASK);
 }
 
 void set_page_map(uint64_t *map)
@@ -92,7 +92,7 @@ static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
         else
         {
             uint64_t next_map_entry = map[page_table_index(virt, i)];
-            next_map_entry &= PAGE_TABLE_ADDRESS_MASK;
+            next_map_entry &= PAGE_ADDRESS_MASK;
             map = (uint64_t *)next_map_entry;
         }
     }
