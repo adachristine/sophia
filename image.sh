@@ -9,7 +9,9 @@ if [[ ! -f ${imagefile} ]]; then
     mformat -i uefi.img -f1440 ::
 fi
 
-mcopy -i ${imagefile} -Do ${loaderfile} ::
+mmd -i ${imagefile} -Do ::EFI
+mmd -i ${imagefile} -Do ::EFI/BOOT
+mcopy -i ${imagefile} -Do ${loaderfile} ::EFI/BOOT/BOOTX64.EFI
 mmd -i ${imagefile} -Do ::adasoft
 mmd -i ${imagefile} -Do ::adasoft/sophia
 mcopy -i ${imagefile} ${kernelfile} -Do ::adasoft/sophia
