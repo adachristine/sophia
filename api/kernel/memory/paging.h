@@ -1,5 +1,7 @@
 #pragma once
 
+#define PAGE_SIZE 0x1000
+
 #define PAGE_PR (1ULL << 0)
 #define PAGE_WR (1ULL << 1)
 #define PAGE_NX (1ULL << 63)
