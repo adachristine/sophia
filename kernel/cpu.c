@@ -26,23 +26,19 @@ void cpu_init(void)
 
     __asm__ volatile
     (   "pushf\n"
-        "mov %%rsp, %%rcx\n"
         "cli\n"
         "lgdt %0\n"
-        "movw %w2, %%ds\n"
-        "movw %w2, %%es\n"
-        "movw %w2, %%fs\n"
-        "movw %w2, %%gs\n"
-        "push %q2\n"
-        "push %%rcx\n"
-        "pushf\n"
-        "push %q1\n"
+        "mov %w2, %%ds\n"
+        "mov %w2, %%es\n"
+        "mov %w2, %%fs\n"
+        "mov %w2, %%gs\n"
+        "pushq %1\n"
         "lea .flush(%%rip), %%rax\n"
         "push %%rax\n"
-        "iretq\n"
+        "lretq\n"
         ".flush:\n"
-       "popf\n"
-        :: "m"(gdtr), "a"(KERNEL_CODE_SEL), "d"(KERNEL_DATA_SEL)
+        "popf\n"
+        :: "m"(gdtr), "i"(KERNEL_CODE_SEL), "r"(KERNEL_DATA_SEL)
     );
 }
 
