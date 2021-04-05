@@ -7,6 +7,7 @@
 
 #define CODE_SEG_INDEX 1
 #define DATA_SEG_INDEX 2
+#define TASK_SEG_INDEX 3
 
 struct dtr64
 {
@@ -28,6 +29,7 @@ enum segment_descriptor_type
 {
     CODE64_SEG,
     DATA_SEG,
+    TASK64_SEG,
 };
 
 struct gate_descriptor
@@ -46,9 +48,22 @@ enum gate_descriptor_type
     TRAP64_GATE,
 };
 
+struct task64_segment
+{
+    uint32_t reserved0;
+    uint64_t rsp0;
+    uint64_t rsp1;
+    uint64_t rsp2;
+    uint64_t reserved1;
+    uint64_t ist[7];
+    uint16_t reserved2;
+    uint16_t iomap_base;
+};
+
 // TODO: is 16 enough?
 static struct segment_descriptor gdt[GDT_ENTRIES];
 static struct gate_descriptor idt[IDT_ENTRIES];
+static struct task64_segment tss;
 
 static void set_gdt(int index,
                     uint64_t base,
@@ -71,26 +86,32 @@ static void set_gdt(int index,
             gdt[index].access = 0x92;
             gdt[index].flags_limit16 |= 0xc0;
             break;
+        case TASK64_SEG:
+            gdt[index].access = 0x89;
+            //TODO: make this cleaner i don't like it
+            gdt[index+1].limit0 = (base >> 32) & 0xffff;
+            gdt[index+1].base0 = (base >> 48) & 0xffff;
+            break;
     };
 }
 
-static void set_idt(int index,
-                   uint16_t selector,
-                   uint64_t offset,
-                   enum gate_descriptor_type type)
+static void set_idt(int vec,
+                    uint16_t selector,
+                    uint64_t offset,
+                    enum gate_descriptor_type type)
 {
-    idt[index].offset0 = offset & 0xffff;
-    idt[index].selector = selector;
-    idt[index].offset16 = (offset >> 16) & 0xffff;
-    idt[index].offset32 = (offset >> 32) & 0xffffffff;
+    idt[vec].offset0 = offset & 0xffff;
+    idt[vec].selector = selector;
+    idt[vec].offset16 = (offset >> 16) & 0xffff;
+    idt[vec].offset32 = (offset >> 32) & 0xffffffff;
 
     switch (type)
     {
         case INT64_GATE:
-            idt[index].access = 0x8e;
+            idt[vec].access = 0x8e;
             break;
         case TRAP64_GATE:
-            idt[index].access = 0x8f;
+            idt[vec].access = 0x8f;
             break;
     }
 }
@@ -99,6 +120,7 @@ static void gdt_init(void)
 {   
     set_gdt(CODE_SEG_INDEX, 0, (uint64_t)-1, CODE64_SEG);
     set_gdt(DATA_SEG_INDEX, 0, (uint64_t)-1, DATA_SEG);
+    set_gdt(TASK_SEG_INDEX, (uint64_t)&tss, sizeof(tss) - 1, TASK64_SEG);
 
     struct dtr64 gdtr = {sizeof(gdt) - 1, (uint64_t)&gdt};
 
@@ -123,10 +145,17 @@ static void gdt_init(void)
         // defined here.
         "lretq\n"
         ".flush:\n"
+        "ltr %w3\n"
         "popf\n"
         // dependency on pre-boot GDT is now gone
-        :: "m"(gdtr), "i"(CODE_SEG_INDEX << 3), "r"(DATA_SEG_INDEX << 3)
+        :
+        : "m"(gdtr),
+          "i"(CODE_SEG_INDEX << 3),
+          "r"(DATA_SEG_INDEX << 3),
+          "r"(TASK_SEG_INDEX << 3)
     );
+
+    
 }
 
 static void idt_init(void)
