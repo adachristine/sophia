@@ -116,6 +116,12 @@ static void set_idt(int vec,
     }
 }
 
+void set_ist(int vec, int ist_index)
+{
+    // non-destructively set the ist index.
+    idt[vec].access |= ist_index & 0x7;
+}
+
 static void gdt_init(void)
 {   
     set_gdt(CODE_SEG_INDEX, 0, (uint64_t)-1, CODE64_SEG);
@@ -154,8 +160,6 @@ static void gdt_init(void)
           "r"(DATA_SEG_INDEX << 3),
           "r"(TASK_SEG_INDEX << 3)
     );
-
-    
 }
 
 static void idt_init(void)
@@ -180,5 +184,14 @@ void cpu_init(void)
 {
     gdt_init();
     idt_init();
+}
+
+void isr_install(int vec, void *isr, int ist)
+{
+    set_idt(vec, CODE_SEG_INDEX << 3, (uint64_t)isr, INT64_GATE);
+    if (ist)
+    {
+        set_ist(vec, ist);
+    }
 }
 
