@@ -145,12 +145,12 @@ static void gdt_init(void)
         // [ss] @rsp+8
         // [rip] @rsp
         "pushq %1\n"
-        "lea .flush(%%rip), %%rax\n"
+        "lea .Lflush(%%rip), %%rax\n"
         "push %%rax\n"
         // far return, now we're in the code segment
         // defined here.
         "lretq\n"
-        ".flush:\n"
+        ".Lflush:\n"
         "ltr %w3\n"
         "popf\n"
         // dependency on pre-boot GDT is now gone
