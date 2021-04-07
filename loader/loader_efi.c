@@ -1,7 +1,7 @@
 #include "loader_efi.h"
 
-#include <boot/entry_efi.h>
-
+#include <loader/data.h>
+#include <kernel/entry.h>
 #include <kernel/memory/paging.h>
 
 #include <elf/elf64.h>

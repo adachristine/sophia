@@ -34,5 +34,3 @@ struct efi_boot_data
     void *acpi_rsdp;
 };
 
-typedef void (*kernel_entry_func)(struct efi_boot_data *data);
-

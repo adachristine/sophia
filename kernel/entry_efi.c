@@ -1,4 +1,5 @@
-#include <boot/entry_efi.h>
+#include <loader/data.h>
+#include <kernel/entry.h>
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -11,7 +12,7 @@
 #include "memory.h"
 
 static noreturn void hang(void);
-
+/*
 static void free_memory_descriptor(EFI_MEMORY_DESCRIPTOR *desc)
 {
     kputs("free_memory_descriptor() called\r\n");
@@ -48,13 +49,15 @@ static void parse_efi_memmap(struct efi_memory_map_data *map)
         }
     }
 }
-
+*/
 noreturn void kernel_entry(struct efi_boot_data *data)
 {
+    (void)data;
     cpu_init();
     serial_init();
+    memory_init();
     kputs("<hacker voice> i'm in\r\n");
-    parse_efi_memmap(data->memory_map);
+    //parse_efi_memmap(data->memory_map);
     hang();
 }
 

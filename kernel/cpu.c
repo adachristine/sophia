@@ -60,7 +60,6 @@ struct task64_segment
     uint16_t iomap_base;
 };
 
-// TODO: is 16 enough?
 static struct segment_descriptor gdt[GDT_ENTRIES];
 static struct gate_descriptor idt[IDT_ENTRIES];
 static struct task64_segment tss;
