@@ -213,16 +213,11 @@ static struct system_buffer get_system_buffer(UINTN size)
     return buffer;
 }
 
-#define KERNEL_ENTRY_STACK_SIZE 0x10000
-#define KERNEL_ENTRY_STACK_HEAD 0xffffffffffc00000
-#define KERNEL_ENTRY_STACK_BASE (KERNEL_ENTRY_STACK_HEAD - KERNEL_ENTRY_STACK_SIZE)
-
 static void enter_kernel(struct system_image *kernel_image)
 {
     struct efi_boot_data data;
     kernel_entry_func kernel_entry;
     kernel_entry = (kernel_entry_func)(kernel_image->ehdr.e_entry);
-
 
     struct system_buffer kernel_entry_stack =
         get_system_buffer(KERNEL_ENTRY_STACK_SIZE);
