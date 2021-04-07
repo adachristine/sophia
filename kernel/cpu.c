@@ -195,3 +195,17 @@ void isr_install(int vec, void *isr, int ist)
     }
 }
 
+void ist_install(int ist, void *stack)
+{
+    tss.ist[ist] = (uint64_t)stack;
+}
+
+void int_enable(void)
+{
+    __asm__ ("sti");
+}
+
+void int_disable(void)
+{
+    __asm__ ("cli");
+}
