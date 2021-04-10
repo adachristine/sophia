@@ -12,22 +12,10 @@
 #include "memory.h"
 
 static noreturn void hang(void);
-/*
-static void free_memory_descriptor(EFI_MEMORY_DESCRIPTOR *desc)
-{
-    kputs("free_memory_descriptor() called\r\n");
-    size_t size = desc->NumberOfPages * EFI_PAGE_SIZE;
-
-    do
-    {
-        size -= EFI_PAGE_SIZE;
-        page_free(desc->PhysicalStart + size);
-    }
-    while (size);
-}
 
 static void parse_efi_memmap(struct efi_memory_map_data *map)
 {
+    struct memory_range *ranges = (struct memory_range *)map->data;
     int entries = map->size / map->descsize;
 
     for (int i = 0; i < entries; i++)
@@ -35,6 +23,13 @@ static void parse_efi_memmap(struct efi_memory_map_data *map)
         EFI_MEMORY_DESCRIPTOR *desc;
         desc = (EFI_MEMORY_DESCRIPTOR *)((char *)map->data + i * map->descsize);
 
+        enum memory_range_type type;
+        phys_addr_t base;
+        size_t size;
+        
+        base = desc->PhysicalStart;
+        size = desc->NumberOfPages * EFI_PAGE_SIZE;
+        
         switch (desc->Type)
         {
             case EfiConventionalMemory:
@@ -42,22 +37,36 @@ static void parse_efi_memmap(struct efi_memory_map_data *map)
             case EfiBootServicesCode:
             case EfiLoaderData:
             case EfiLoaderCode:
-                free_memory_descriptor(desc);
+                type = AVAILABLE_MEMORY;
+                break;
+            case SystemMemoryType:
+                type = SYSTEM_MEMORY;
                 break;
             default:
-                break;
+                type = RESERVED_MEMORY;
         }
+        
+        ranges[i].type = type;
+        ranges[i].base = base;
+        ranges[i].size = size;
     }
+    
+    memory_init(ranges, entries);
 }
-*/
+
 noreturn void kernel_entry(struct efi_boot_data *data)
 {
     (void)data;
     cpu_init();
     serial_init();
-    memory_init();
     kputs("<hacker voice> i'm in\r\n");
-    //parse_efi_memmap(data->memory_map);
+    parse_efi_memmap(data->memory_map);
+    for (int i = 0; i < 10; i++)
+    {
+        phys_addr_t page = page_alloc();
+        (void)page;
+        page_free(page);
+    }
     hang();
 }
 
