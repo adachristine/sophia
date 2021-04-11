@@ -19,7 +19,7 @@ LOADLIBES := -lgcc
 
 SOBJS := 
 GOBJS := entry_efi.o kprint.o serial.o port.o main.o memory.o \
-	 memset.o memcpy.o memmove.o memcmp.o cpu.o 
+	 memset.o memcpy.o memmove.o memcmp.o cpu.o exceptions.o 
 IOBJS :=
 
 $(SOBJS): CFLAGS += -fPIC

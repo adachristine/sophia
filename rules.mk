@@ -29,6 +29,10 @@ COMPILE.info = $(info $$(CC) $@)
 	$(COMPILE.info)
 	@$(COMPILE.cpp) -MMD -MP
 
+%.o: %.S
+	$(COMPILE.info)
+	@$(COMPILE.S) -MMD -MP
+
 clean:
 	$(info $$(RM) $(CLEANLIST))
 	-@$(RM) $(CLEANLIST)

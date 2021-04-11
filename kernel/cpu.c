@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "exceptions.h"
 
 #include <stdint.h>
 
@@ -140,6 +141,7 @@ static void gdt_init(void)
         "mov %w2, %%es\n"
         "mov %w2, %%fs\n"
         "mov %w2, %%gs\n"
+        "mov %w2, %%ss\n"
         // make a far return frame on the stack
         // [ss] @rsp+8
         // [rip] @rsp
@@ -183,11 +185,24 @@ void cpu_init(void)
 {
     gdt_init();
     idt_init();
+    exceptions_init();
 }
 
-void isr_install(int vec, void *isr, int ist)
+void exceptions_init(void)
 {
-    set_idt(vec, CODE_SEG_INDEX << 3, (uint64_t)isr, INT64_GATE);
+    isr_install(PAGE_FAULT_VECTOR, &page_fault_isr, 0, 0);
+}
+
+void isr_install(int vec, void (*isr)(void), int trap, int ist)
+{
+    enum gate_descriptor_type type = INT64_GATE;
+    
+    if (trap)
+    {
+        type = TRAP64_GATE;
+    }
+    
+    set_idt(vec, CODE_SEG_INDEX << 3, (uint64_t)isr, type);
     if (ist)
     {
         set_ist(vec, ist);

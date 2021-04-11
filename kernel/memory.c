@@ -1,4 +1,5 @@
 #include "memory.h"
+#include "kprint.h"
 
 #include <kernel/memory/paging.h>
 
@@ -326,11 +327,10 @@ void kernel_unmap_page(void *vaddr)
 
 phys_addr_t page_alloc(void)
 {
-    int index;
+    int index = first_free_page_index;
     
-    if (first_free_page_index > 0)
+    if (index > 0)
     {
-        index = first_free_page_index;
         page_array[index].used = 1;
         first_free_page_index = page_array[index].next;
     }
@@ -360,4 +360,12 @@ static uint64_t *get_kernel_pm1e(void *vaddr)
 static uint64_t *get_kernel_pm2e(void *vaddr)
 {
     return &kernel_pm2[kpm2_index(vaddr)];
+}
+
+int page_fault_handler(uint32_t code, void *address)
+{
+    (void)code;
+    (void)address;
+    kputs("page faulmt\n");
+    return 0;
 }
