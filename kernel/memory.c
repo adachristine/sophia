@@ -136,53 +136,28 @@ static void init_map_page_array_pm2(struct memory_range *pm2_pages)
     kernel_unmap_page(pm3);
 }
 
-static void init_create_page_array_pm1(struct memory_range *pa_pages,
-                                       struct memory_range *pm1_pages)
+static void init_create_page_array_map(struct memory_range *pages,
+                                       struct memory_range *maps)
 {
     // pm1 indices for page_array always start at 0
-    size_t pm1_entry_count = pa_pages->size / PAGE_SIZE;
+    size_t pm1_entry_count = pages->size / PAGE_SIZE;
     
     // every 512 entries we need to re-map and clean.
     for (size_t i = 0; i < pm1_entry_count; i += PAGE_TABLE_INDEX_MASK)
     {
         uint64_t *pm1 = kernel_map_page_at(temp,
-                                           pm1_pages->base + i * PAGE_SIZE,
+                                           maps->base + i * PAGE_SIZE,
                                            CONTENT_RWDATA|SIZE_2M);
         memset(pm1, 0, PAGE_SIZE);
         for (size_t j = 0;
              (j < PAGE_TABLE_INDEX_MASK) && ((j + i) < pm1_entry_count);
              j++)
         {
-            pm1[j] = (pa_pages->base + (i + j) * PAGE_SIZE)|
+            pm1[j] = (pages->base + (i + j) * PAGE_SIZE)|
                      PAGE_NX|PAGE_WR|PAGE_PR; 
         }
         
         kernel_unmap_page(pm1);
-    }
-}
-
-static void init_create_page_array_pm2(struct memory_range *pm1_pages,
-                                       struct memory_range *pm2_pages)
-{
-    // i don't fucken have 1TB of memory to test this lol.
-    // pm2 indicies for page_array always tart at 0.
-    size_t pm2_entry_count = pm1_pages->size / PAGE_SIZE;
-    // every 512 entries we need to re-map and clean.
-    for (size_t i = 0; i < pm2_entry_count; i += PAGE_TABLE_INDEX_MASK)
-    {
-        uint64_t *pm2 = kernel_map_page_at(temp,
-                                           pm2_pages->base + i * PAGE_SIZE,
-                                           CONTENT_RWDATA|SIZE_2M);
-        memset(pm2, 0, PAGE_SIZE);
-        for (size_t j = 0;
-             (j < PAGE_TABLE_INDEX_MASK) && ((j + i) < pm2_entry_count); 
-             j++)
-        {
-            pm2[j] = (pm1_pages->base + (i + j) * PAGE_SIZE)|
-                     PAGE_NX|PAGE_WR|PAGE_PR;
-        }
-        
-        kernel_unmap_page(pm2);
     }
 }
 
@@ -234,7 +209,7 @@ static void init_create_page_array(struct memory_range *ranges, int count)
                                                     count,
                                                     pm1_count * PAGE_SIZE);
     
-    init_create_page_array_pm1(&pa_pages, &pm1_pages);
+    init_create_page_array_map(&pa_pages, &pm1_pages);
     
     // the number of page directories needed to map pa_pages
     // this will be 1 on systems with less than 1TB of memory.
@@ -244,7 +219,7 @@ static void init_create_page_array(struct memory_range *ranges, int count)
                                                     count,
                                                     pm2_count * PAGE_SIZE);
     
-    init_create_page_array_pm2(&pm1_pages, &pm2_pages);
+    init_create_page_array_map(&pm1_pages, &pm2_pages);
     
     // ok here goes
     init_map_page_array_pm2(&pm2_pages);
