@@ -13,8 +13,12 @@
 
 static noreturn void hang(void);
 
-static void parse_efi_memmap(struct efi_memory_map_data *map)
+static void efi_memory_init(struct efi_memory_map_data *map)
 {
+    // FIXME: bad girl shit: overwriting on aliased pointers.
+    // this is a temporary solution to shortcomings with
+    // loader boot data. it's sort-of OK because the memory_range struct
+    // is smaller than EFI_MEMORY_DESCRIPTOR. it's still not good.
     struct memory_range *ranges = (struct memory_range *)map->data;
     int entries = map->size / map->descsize;
 
@@ -60,13 +64,7 @@ noreturn void kernel_entry(struct efi_boot_data *data)
     cpu_init();
     serial_init();
     kputs("<hacker voice> i'm in\r\n");
-    parse_efi_memmap(data->memory_map);
-    for (int i = 0; i < 10; i++)
-    {
-        phys_addr_t page = page_alloc();
-        (void)page;
-        page_free(page);
-    }
+    efi_memory_init(data->memory_map);
     hang();
 }
 
