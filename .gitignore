@@ -5,4 +5,5 @@
 *.os
 *.efi
 *.log
+*.kate-swp
 
