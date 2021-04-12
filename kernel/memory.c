@@ -1,6 +1,8 @@
 #include "memory.h"
 #include "kprint.h"
+#include "panic.h"
 
+#include <kernel/entry.h>
 #include <kernel/memory/paging.h>
 
 /* kernel virtual space guarantees
@@ -15,6 +17,28 @@
 #define kpm2_index(v) (((uint64_t)v >> page_table_index_bits(2)) & 0x3ff)
 
 #define align_next(v, a) (((uint64_t)v + a - 1) & ~(a - 1))
+
+// a conservative 128MB for kernel heap
+#define KERNEL_HEAP_SPACE_SIZE (128 << 20)
+
+typedef int (*page_fault_handler_func)(uint32_t code, void *address);
+
+enum memory_space_flags
+{
+    AVAILABLE_MEMORY_SPACE, // memory that is not used
+    SYSTEM_MEMORY_SPACE, // memory that cannot fault
+    ANONYMOUS_MEMORY_SPACE, // memory that can fault
+};
+
+struct memory_space
+{
+    enum memory_space_flags flags;
+    page_fault_handler_func handler;
+    void *base;
+    void *head;
+    struct memory_space *next;
+    struct memory_space *prev;
+};
 
 struct page
 {
@@ -31,6 +55,7 @@ extern char k_data_end;
 static struct page *const page_array = (struct page *)0xffffffd800000000;
 static int first_free_page_index = -1;
 static size_t page_array_entries = 0;
+static size_t free_pages = 0;
 
 // the temporary mapping place. never use this permanently.
 static void *const temp = (void *)0xffffffffffa00000;
@@ -39,6 +64,24 @@ static uint64_t *const kernel_pm2 = (uint64_t *)0xffffffffffffe000;
 
 static uint64_t *get_kernel_pm1e(void *vaddr);
 static uint64_t *get_kernel_pm2e(void *vaddr);
+static void *get_virtual_page(enum map_page_flags flags);
+static void *kernel_map_page_at(void *vaddr,
+                                phys_addr_t paddr,
+                                enum map_page_flags flags);
+
+// handlers for memory space types
+int anonymous_page_handler(uint32_t code, void *address);
+
+// the system memory_space's that are always present
+static struct memory_space kernel_image_space;
+static struct memory_space kernel_stack_space;
+static struct memory_space kernel_pagemap_space;
+
+// NULL if the system address spaces are not set up
+static struct memory_space *root_memory_space;
+
+// the kernel's own heap space
+static struct memory_space kernel_heap_space;
 
 static struct memory_range init_grab_pages(struct memory_range *ranges,
                                            int count,
@@ -232,14 +275,61 @@ static void init_create_page_array(struct memory_range *ranges, int count)
     init_populate_page_array(&pm2_pages, 1);
 }
 
+static struct memory_space init_system_space(void *base, void *head)
+{
+    struct memory_space space = {SYSTEM_MEMORY_SPACE, NULL, base, head, NULL, NULL};
+    return space;
+}
+
+static struct memory_space init_anonymous_space(void *base, void *head)
+{
+    struct memory_space space = {ANONYMOUS_MEMORY_SPACE,
+                                 &anonymous_page_handler,
+                                 base,
+                                 head,
+                                 NULL,
+                                 NULL};
+    
+    return space;
+}
+
+static void init_heap_space(struct memory_space *heap)
+{
+    uint64_t *heap_alias = heap->base;
+    *heap_alias = 0xfafafafa;
+}
+
 void memory_init(struct memory_range *ranges, int count)
 {
     init_create_page_array(ranges, count);
+    // initialize always-present memory spaces for the vmm
+    kernel_image_space = init_system_space((void *)&k_text_begin,
+                                           (void *)align_next(&k_data_end, PAGE_SIZE));
+    kernel_stack_space = init_system_space((void *)KERNEL_ENTRY_STACK_BASE,
+                                           (void *)KERNEL_ENTRY_STACK_HEAD);
+    kernel_pagemap_space = init_system_space(kernel_pm1, (void *)-1LL);
+    
+    // initialize the kernel heap space
+    kernel_heap_space = init_anonymous_space(kernel_image_space.head,
+                                             (char *)kernel_image_space.head +
+                                             KERNEL_HEAP_SPACE_SIZE);
+    
+    // set up the list links
+    kernel_image_space.next = &kernel_heap_space;
+    kernel_heap_space.prev = &kernel_image_space;
+    kernel_heap_space.next = &kernel_stack_space;
+    kernel_stack_space.prev = &kernel_heap_space;
+    kernel_stack_space.next = &kernel_pagemap_space;
+    kernel_pagemap_space.prev = &kernel_stack_space;
+    
+    root_memory_space = &kernel_image_space;
+    
+    init_heap_space(&kernel_heap_space);
 }
 
-void *kernel_map_page_at(void *vaddr,
-                         phys_addr_t paddr,
-                         enum map_page_flags flags)
+static void *kernel_map_page_at(void *vaddr,
+                                phys_addr_t paddr,
+                                enum map_page_flags flags)
 {
     uint64_t entry = PAGE_PR;
     
@@ -284,6 +374,11 @@ void *kernel_map_page_at(void *vaddr,
     return NULL;
 }
 
+void *kernel_map_page(phys_addr_t paddr, enum map_page_flags flags)
+{
+    return kernel_map_page_at(get_virtual_page(flags), paddr, flags);
+}
+
 void kernel_unmap_page(void *vaddr)
 {
     uint64_t *pte = get_kernel_pm2e(vaddr);
@@ -308,14 +403,15 @@ phys_addr_t page_alloc(void)
     {
         page_array[index].used = 1;
         first_free_page_index = page_array[index].next;
+        free_pages--;
     }
     
     return (phys_addr_t)index * PAGE_SIZE;
 }
 
-void page_free(phys_addr_t page)
+void page_free(phys_addr_t paddr)
 {
-    int index = page / PAGE_SIZE;
+    int index = paddr / PAGE_SIZE;
     
     if ((size_t)index > page_array_entries)
     {
@@ -325,6 +421,7 @@ void page_free(phys_addr_t page)
     page_array[index].used = 0;
     page_array[index].next = first_free_page_index;
     first_free_page_index = index;
+    free_pages++;
 }
 
 static uint64_t *get_kernel_pm1e(void *vaddr)
@@ -337,10 +434,50 @@ static uint64_t *get_kernel_pm2e(void *vaddr)
     return &kernel_pm2[kpm2_index(vaddr)];
 }
 
-int page_fault_handler(uint32_t code, void *address)
+static void *get_virtual_page(enum map_page_flags flags)
+{
+    (void)flags;
+    return NULL;
+}
+
+static struct memory_space *get_memory_space(void *address)
+{
+    // walk the memory space list
+    struct memory_space *space = root_memory_space;
+    
+    while (space)
+    {
+        if (space->base >= address && address <= space->head)
+        {
+            return space;
+        }
+        space = space->next;
+    }
+
+    return NULL;
+}
+
+int anonymous_page_handler(uint32_t code, void *address)
 {
     (void)code;
     (void)address;
+    kputs("anonymous fault\n");
+    return -1;
+}
+
+int page_fault_handler(uint32_t code, void *address)
+{
     kputs("page faulmt\n");
+    struct memory_space *space = get_memory_space(address);
+    if (space && space->handler)
+    {
+        int result = space->handler(code, address);
+        
+        if (result)
+        {
+            panic(UNHANDLED_FAULT);
+        }
+    }
+    
     return 0;
 }

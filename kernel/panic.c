@@ -1,4 +1,7 @@
 #include "panic.h"
+#include "kprint.h"
+
+#include <stdbool.h>
 
 static char const *reason_strings[] = {
     "general panic",
@@ -8,7 +11,7 @@ static char const *reason_strings[] = {
 noreturn void panic(enum panic_reason reason)
 {
     // TODO: kprintf() and friends
-    kputs("kernel panic: ")
+    kputs("kernel panic: ");
     kputs(reason_strings[reason]);
     kputs("\n");
     halt();

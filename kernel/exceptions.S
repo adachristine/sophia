@@ -52,4 +52,3 @@ page_fault_isr:
     /* leave the isr */
     iretq
 .size page_fault_isr, . - page_fault_isr
-    

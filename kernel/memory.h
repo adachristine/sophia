@@ -40,10 +40,8 @@ void *memmove(void *dest, const void *src, size_t size);
 void *memset(void *dest, int val, size_t size);
 void *memcmp(const void *str1, const void *str2, size_t count);
 
-void *kernel_map_page_at(void *vaddr,
-                         phys_addr_t phys,
-                         enum map_page_flags flags);
-void kernel_unmap_page(void *virt);
+void *kernel_map_page(phys_addr_t paddr, enum map_page_flags flags);
+void kernel_unmap_page(void *vaddr);
 
 phys_addr_t page_alloc(void);
-void page_free(phys_addr_t page);
+void page_free(phys_addr_t paddr);
