@@ -6,6 +6,7 @@
 static char const *reason_strings[] = {
     "general panic",
     "unhandled fault",
+    "out of memory"
 };
 
 noreturn void panic(enum panic_reason reason)

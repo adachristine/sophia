@@ -182,18 +182,18 @@ static void init_map_page_array_pm2(struct memory_range *pm2_pages)
 static void init_create_page_array_map(struct memory_range *pages,
                                        struct memory_range *maps)
 {
-    // pm1 indices for page_array always start at 0
-    size_t pm1_entry_count = pages->size / PAGE_SIZE;
+    // indices for page_array always start at 0
+    size_t entry_count = pages->size / PAGE_SIZE;
     
     // every 512 entries we need to re-map and clean.
-    for (size_t i = 0; i < pm1_entry_count; i += PAGE_TABLE_INDEX_MASK)
+    for (size_t i = 0; i < entry_count; i += PAGE_TABLE_INDEX_MASK)
     {
         uint64_t *pm1 = kernel_map_page_at(temp,
                                            maps->base + i * PAGE_SIZE,
                                            CONTENT_RWDATA|SIZE_2M);
         memset(pm1, 0, PAGE_SIZE);
         for (size_t j = 0;
-             (j < PAGE_TABLE_INDEX_MASK) && ((j + i) < pm1_entry_count);
+             (j < PAGE_TABLE_INDEX_MASK) && ((j + i) < entry_count);
              j++)
         {
             pm1[j] = (pages->base + (i + j) * PAGE_SIZE)|
@@ -460,9 +460,44 @@ static struct memory_space *get_memory_space(void *address)
 int anonymous_page_handler(uint32_t code, void *address)
 {
     (void)code;
-    (void)address;
     kputs("anonymous fault\n");
-    return -1;
+    // kernel page mappings are built different
+    if (address >= (void *)&k_virt_base)
+    {
+        uint64_t *pm2e = get_kernel_pm2e(address);
+        
+        if (! (*pm2e & PAGE_ADDRESS_MASK))
+        {
+            // create a page table and install it
+            phys_addr_t pm1_phys = page_alloc();
+            uint64_t *pm1;
+            if (pm1_phys)
+            {
+                pm1 = kernel_map_page_at(temp, pm1_phys, CONTENT_RWDATA|SIZE_2M);
+            }
+            else
+            {
+                panic(OUT_OF_MEMORY);
+            }
+            // zero the page
+            memset(pm1, 0, PAGE_SIZE);
+            // put the table where it goes
+            *pm2e = (pm1_phys & PAGE_ADDRESS_MASK)|PAGE_WR|PAGE_PR;
+            kernel_unmap_page(pm1);
+        }
+        
+        uint64_t *pm1e = get_kernel_pm1e(address);
+        
+        if (pm1e)
+        {
+            phys_addr_t page_phys = page_alloc();
+            if (page_phys)
+            {
+                *pm1e = (page_phys & PAGE_ADDRESS_MASK)|PAGE_WR|PAGE_PR;
+            }
+        }
+    }
+    return 0;
 }
 
 int page_fault_handler(uint32_t code, void *address)
