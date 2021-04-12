@@ -10,8 +10,7 @@
 #include "serial.h"
 #include "kprint.h"
 #include "memory.h"
-
-static noreturn void hang(void);
+#include "panic.h"
 
 static void efi_memory_init(struct efi_memory_map_data *map)
 {
@@ -65,12 +64,5 @@ noreturn void kernel_entry(struct efi_boot_data *data)
     serial_init();
     kputs("<hacker voice> i'm in\r\n");
     efi_memory_init(data->memory_map);
-    hang();
+    halt();
 }
-
-static noreturn void hang(void)
-{
-    __asm__ ("cli\n\t");
-    while (true) __asm__ ("hlt\n\t");
-}
-
