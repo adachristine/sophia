@@ -20,7 +20,7 @@ struct memory_range
     size_t size;
 };
 
-enum map_page_flags
+enum page_map_flags
 {
     CONTENT_CODE = 0x1,
     CONTENT_RODATA = 0x2,
@@ -40,8 +40,8 @@ void *memmove(void *dest, const void *src, size_t size);
 void *memset(void *dest, int val, size_t size);
 int memcmp(const void *str1, const void *str2, size_t count);
 
-void *kernel_map_page(phys_addr_t paddr, enum map_page_flags flags);
-void kernel_unmap_page(void *vaddr);
+void *page_map(phys_addr_t paddr, enum page_map_flags flags);
+void page_unmap(void *vaddr);
 
 phys_addr_t page_alloc(void);
 void page_free(phys_addr_t paddr);

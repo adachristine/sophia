@@ -64,10 +64,10 @@ static uint64_t *const kernel_pm2 = (uint64_t *)0xffffffffffffe000;
 
 static uint64_t *get_kernel_pm1e(void *vaddr);
 static uint64_t *get_kernel_pm2e(void *vaddr);
-static void *get_virtual_page(enum map_page_flags flags);
-static void *kernel_map_page_at(void *vaddr,
+static void *get_virtual_page(enum page_map_flags flags);
+static void *page_map_at(void *vaddr,
                                 phys_addr_t paddr,
-                                enum map_page_flags flags);
+                                enum page_map_flags flags);
 
 // handlers for memory space types
 int anonymous_page_handler(uint32_t code, void *address);
@@ -148,14 +148,14 @@ static phys_addr_t get_kernel_pm3_phys(void)
 {
     phys_addr_t pm3_phys;
     // make a temporary mapping to read pm4
-    uint64_t *pm4 = kernel_map_page_at(temp,
+    uint64_t *pm4 = page_map_at(temp,
                                        get_kernel_pm4_phys(),
                                        CONTENT_RODATA|SIZE_2M);
     
     // pm3_phys is in pm4.
     pm3_phys = pm4[page_table_index(&k_virt_base, 4)] & PAGE_ADDRESS_MASK;
     // never leave a temporary mapping
-    kernel_unmap_page(pm4);
+    page_unmap(pm4);
     
     return pm3_phys;
 }
@@ -164,7 +164,7 @@ static void init_map_page_array_pm2(struct memory_range *pm2_pages)
 {
     // now we need to write the physical address of each pm2 page for the
     // page_array in the kernel's pm3.
-    uint64_t *pm3 = kernel_map_page_at(temp,
+    uint64_t *pm3 = page_map_at(temp,
                                       get_kernel_pm3_phys(),
                                       CONTENT_RWDATA|SIZE_2M);
     
@@ -176,7 +176,7 @@ static void init_map_page_array_pm2(struct memory_range *pm2_pages)
                                                     PAGE_PR;
     }
     // never forget to unmap temporary mappings.
-    kernel_unmap_page(pm3);
+    page_unmap(pm3);
 }
 
 static void init_create_page_array_map(struct memory_range *pages,
@@ -188,7 +188,7 @@ static void init_create_page_array_map(struct memory_range *pages,
     // every 512 entries we need to re-map and clean.
     for (size_t i = 0; i < entry_count; i += PAGE_TABLE_INDEX_MASK)
     {
-        uint64_t *pm1 = kernel_map_page_at(temp,
+        uint64_t *pm1 = page_map_at(temp,
                                            maps->base + i * PAGE_SIZE,
                                            CONTENT_RWDATA|SIZE_2M);
         memset(pm1, 0, PAGE_SIZE);
@@ -200,7 +200,7 @@ static void init_create_page_array_map(struct memory_range *pages,
                      PAGE_NX|PAGE_WR|PAGE_PR; 
         }
         
-        kernel_unmap_page(pm1);
+        page_unmap(pm1);
     }
 }
 
@@ -327,9 +327,9 @@ void memory_init(struct memory_range *ranges, int count)
     init_heap_space(&kernel_heap_space);
 }
 
-static void *kernel_map_page_at(void *vaddr,
+static void *page_map_at(void *vaddr,
                                 phys_addr_t paddr,
-                                enum map_page_flags flags)
+                                enum page_map_flags flags)
 {
     uint64_t entry = PAGE_PR;
     
@@ -374,12 +374,12 @@ static void *kernel_map_page_at(void *vaddr,
     return NULL;
 }
 
-void *kernel_map_page(phys_addr_t paddr, enum map_page_flags flags)
+void *page_map(phys_addr_t paddr, enum page_map_flags flags)
 {
-    return kernel_map_page_at(get_virtual_page(flags), paddr, flags);
+    return page_map_at(get_virtual_page(flags), paddr, flags);
 }
 
-void kernel_unmap_page(void *vaddr)
+void page_unmap(void *vaddr)
 {
     uint64_t *pte = get_kernel_pm2e(vaddr);
     
@@ -434,7 +434,7 @@ static uint64_t *get_kernel_pm2e(void *vaddr)
     return &kernel_pm2[kpm2_index(vaddr)];
 }
 
-static void *get_virtual_page(enum map_page_flags flags)
+static void *get_virtual_page(enum page_map_flags flags)
 {
     (void)flags;
     return NULL;
@@ -473,7 +473,7 @@ int anonymous_page_handler(uint32_t code, void *address)
             uint64_t *pm1;
             if (pm1_phys)
             {
-                pm1 = kernel_map_page_at(temp, pm1_phys, CONTENT_RWDATA|SIZE_2M);
+                pm1 = page_map_at(temp, pm1_phys, CONTENT_RWDATA|SIZE_2M);
             }
             else
             {
@@ -483,7 +483,7 @@ int anonymous_page_handler(uint32_t code, void *address)
             memset(pm1, 0, PAGE_SIZE);
             // put the table where it goes
             *pm2e = (pm1_phys & PAGE_ADDRESS_MASK)|PAGE_WR|PAGE_PR;
-            kernel_unmap_page(pm1);
+            page_unmap(pm1);
         }
         
         uint64_t *pm1e = get_kernel_pm1e(address);
