@@ -46,5 +46,5 @@ void page_unmap(void *vaddr);
 phys_addr_t page_alloc(void);
 void page_free(phys_addr_t paddr);
 
-void *heap_alloc(size_t size);
-void heap_free(void *block);
+void *malloc(size_t size);
+void free(void *block);

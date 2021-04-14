@@ -25,7 +25,6 @@ typedef int (*page_fault_handler_func)(uint32_t code, void *address);
 
 enum memory_space_flags
 {
-    AVAILABLE_MEMORY_SPACE, // memory that is not used
     SYSTEM_MEMORY_SPACE, // memory that cannot fault
     ANONYMOUS_MEMORY_SPACE, // memory that can fault
 };
@@ -65,9 +64,7 @@ static uint64_t *const kernel_pm2 = (uint64_t *)0xffffffffffffe000;
 static uint64_t *get_kernel_pm1e(void *vaddr);
 static uint64_t *get_kernel_pm2e(void *vaddr);
 static void *get_virtual_page(enum page_map_flags flags);
-static void *page_map_at(void *vaddr,
-                                phys_addr_t paddr,
-                                enum page_map_flags flags);
+static void *page_map_at(void *vaddr, phys_addr_t paddr, enum page_map_flags flags);
 
 // handlers for memory space types
 int anonymous_page_handler(uint32_t code, void *address);
@@ -76,12 +73,11 @@ int anonymous_page_handler(uint32_t code, void *address);
 static struct memory_space kernel_image_space;
 static struct memory_space kernel_stack_space;
 static struct memory_space kernel_pagemap_space;
+// the kernel's own heap space
+static struct memory_space kernel_heap_space;
 
 // NULL if the system address spaces are not set up
 static struct memory_space *root_memory_space;
-
-// the kernel's own heap space
-static struct memory_space kernel_heap_space;
 
 static struct memory_range init_grab_pages(struct memory_range *ranges,
                                            int count,
@@ -208,20 +204,18 @@ static void init_set_memory_range(struct memory_range *range)
 {
     for (size_t i = 0; i < range->size / PAGE_SIZE; i++)
     {
-        if (range->base / PAGE_SIZE > page_array_entries)
+        if (range->base / PAGE_SIZE + i > page_array_entries)
         {
             return;
         }
         
-        struct page *page = &page_array[range->base / PAGE_SIZE + i];
         if (range->type == AVAILABLE_MEMORY)
         {
-            page->used = 0;
-            page->next = first_free_page_index;
-            first_free_page_index = range->base / PAGE_SIZE + i;
+            page_free(range->base + PAGE_SIZE * i);
         }
         else
         {
+            struct page *page = &page_array[range->base / PAGE_SIZE + i];
             page->used = 1;
         }
     }
@@ -295,8 +289,8 @@ static struct memory_space init_anonymous_space(void *base, void *head)
 
 static void init_heap_space(struct memory_space *heap)
 {
-    uint64_t *heap_alias = heap->base;
-    *heap_alias = 0xfafafafa;
+    // the heap is anonymous space that will grow as-needed.
+    (void)heap;
 }
 
 void memory_init(struct memory_range *ranges, int count)
