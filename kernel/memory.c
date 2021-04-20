@@ -453,7 +453,12 @@ static struct memory_space *get_memory_space(void *address)
 
 int anonymous_page_handler(uint32_t code, void *address)
 {
-    (void)code;
+    if (code & PAGE_PR)
+    {
+        // there's no reason a protection violation should happen
+        // in anonymous space
+        panic(UNHANDLED_FAULT);
+    }
     kputs("anonymous fault\n");
     // kernel page mappings are built different
     if (address >= (void *)&k_virt_base)
