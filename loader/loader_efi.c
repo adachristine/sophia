@@ -83,18 +83,15 @@ static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
 
     for (int i = PAGE_MAP_LEVELS; i > level; i--)
     {
-        if (!map[page_table_index(virt, i)])
+        if (!map[pte_index(virt, i)])
         {
             uint64_t *next_map = new_page_table();
-            map[page_table_index(virt, i)] =
-                (uint64_t)next_map|PAGE_PR|PAGE_WR;
+            map[pte_index(virt, i)] = (uint64_t)next_map|PAGE_PR|PAGE_WR;
             map = next_map;
         }
         else
         {
-            uint64_t next_map_entry = map[page_table_index(virt, i)];
-            next_map_entry &= PAGE_ADDRESS_MASK;
-            map = (uint64_t *)next_map_entry;
+            map = (uint64_t *)page_address(map[pte_index(virt, i)], 1);
         }
     }
 
@@ -105,7 +102,7 @@ static uint64_t *get_page_entry(uint64_t *map, uint64_t virt)
 {
     int level = 1;
     uint64_t *table = get_page_table(map, virt, level);
-    return &table[page_table_index(virt, level)];
+    return &table[pte_index(virt, level)];
 }
 
 static void map_page(void *map,
@@ -181,9 +178,9 @@ static void create_kernel_maps(struct system_image *image)
                                               2);
 
     upper_page_dir[PAGE_TABLE_INDEX_MASK] =
-        (uint64_t)upper_page_dir|PAGE_PR|PAGE_WR;
+        (uint64_t)upper_page_dir|DATA_PAGE_TYPE;
     upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
-        (uint64_t)lower_page_dir|PAGE_PR|PAGE_WR;
+        (uint64_t)lower_page_dir|DATA_PAGE_TYPE;
 
 }
 

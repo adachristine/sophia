@@ -2,6 +2,8 @@
 #include "kprint.h"
 #include "panic.h"
 
+#include <stdint.h>
+
 #include <kernel/entry.h>
 #include <kernel/memory/paging.h>
 
@@ -13,8 +15,8 @@
  *    own mapping tables begin at +0x7fffe000.
  */
 
-#define kpm1_index(v) (((uint64_t)v >> page_table_index_bits(1)) & 0x7ffff)
-#define kpm2_index(v) (((uint64_t)v >> page_table_index_bits(2)) & 0x3ff)
+#define kpm1_index(v) (((uint64_t)v >> pte_index_bits(1)) & 0x7ffff)
+#define kpm2_index(v) (((uint64_t)v >> pte_index_bits(2)) & 0x3ff)
 
 #define align_next(v, a) (((uint64_t)v + a - 1) & ~(a - 1))
 
@@ -132,12 +134,10 @@ static phys_addr_t get_kernel_pm4_phys(void)
     phys_addr_t pm4_phys;
     __asm__ (
              "mov %%cr3, %0\n\t"
-             "and %0, %1\n\t"
              : "=r"(pm4_phys)
-             : "r"((uint64_t)PAGE_ADDRESS_MASK)
     );
     
-    return pm4_phys;
+    return page_address(pm4_phys, 1);
 }
 
 static phys_addr_t get_kernel_pm3_phys(void)
@@ -145,11 +145,11 @@ static phys_addr_t get_kernel_pm3_phys(void)
     phys_addr_t pm3_phys;
     // make a temporary mapping to read pm4
     uint64_t *pm4 = page_map_at(temp,
-                                       get_kernel_pm4_phys(),
-                                       CONTENT_RODATA|SIZE_2M);
+                                get_kernel_pm4_phys(),
+                                CONTENT_RODATA|SIZE_2M);
     
     // pm3_phys is in pm4.
-    pm3_phys = pm4[page_table_index(&k_virt_base, 4)] & PAGE_ADDRESS_MASK;
+    pm3_phys = page_address(pm4[pte_index(&k_virt_base, 4)], 1);
     // never leave a temporary mapping
     page_unmap(pm4);
     
@@ -161,15 +161,14 @@ static void init_map_page_array_pm2(struct memory_range *pm2_pages)
     // now we need to write the physical address of each pm2 page for the
     // page_array in the kernel's pm3.
     uint64_t *pm3 = page_map_at(temp,
-                                      get_kernel_pm3_phys(),
-                                      CONTENT_RWDATA|SIZE_2M);
+                                get_kernel_pm3_phys(),
+                                CONTENT_RWDATA|SIZE_2M);
     
     // the first index is NOT zero!
     for (size_t i = 0; i < (pm2_pages->size / PAGE_SIZE); i++)
     {
-        pm3[page_table_index(page_array, 3) + i] = (pm2_pages->base + i *
-                                                    PAGE_SIZE)|PAGE_NX|PAGE_WR|
-                                                    PAGE_PR;
+        pm3[pte_index(page_array, 3) + i] = (pm2_pages->base + i *
+                                             PAGE_SIZE)|PAGE_NX|PAGE_WR|PAGE_PR;
     }
     // never forget to unmap temporary mappings.
     page_unmap(pm3);
@@ -233,7 +232,7 @@ static void init_create_page_array(struct memory_range *ranges, int count)
 {
     // the highest actual physical memory address.
     size_t max_paddr = init_get_max_paddr(ranges, count);
-    page_array_entries = max_paddr / PAGE_SIZE;
+    page_array_entries = max_paddr / page_size(1);
     size_t page_array_size = page_array_entries * sizeof(struct page);
     
     // the physical pages that will contain page_array
@@ -241,20 +240,20 @@ static void init_create_page_array(struct memory_range *ranges, int count)
     
     // the number of page tables needed to map pa_pages
     // this will be 1 on systems with less than 2GB of memory.
-    size_t pm1_count = align_next(pa_pages.size, PAGE_SIZE_LARGE) / PAGE_SIZE_LARGE;
+    size_t pm1_count = page_count(pa_pages.size, 2);
     struct memory_range pm1_pages = init_grab_pages(ranges,
                                                     count,
-                                                    pm1_count * PAGE_SIZE);
+                                                    pm1_count * page_size(1));
     
     init_create_page_array_map(&pa_pages, &pm1_pages);
     
     // the number of page directories needed to map pa_pages
     // this will be 1 on systems with less than 1TB of memory.
     // who the fuck has 1TB of memory lol
-    size_t pm2_count = align_next(pa_pages.size, PAGE_SIZE_HUGE) / PAGE_SIZE_HUGE;
+    size_t pm2_count = page_count(pa_pages.size, 3);
     struct memory_range pm2_pages = init_grab_pages(ranges,
                                                     count,
-                                                    pm2_count * PAGE_SIZE);
+                                                    pm2_count * page_size(1));
     
     init_create_page_array_map(&pm1_pages, &pm2_pages);
     
@@ -322,8 +321,8 @@ void memory_init(struct memory_range *ranges, int count)
 }
 
 static void *page_map_at(void *vaddr,
-                                phys_addr_t paddr,
-                                enum page_map_flags flags)
+                         phys_addr_t paddr,
+                         enum page_map_flags flags)
 {
     uint64_t entry = PAGE_PR;
     
@@ -345,13 +344,13 @@ static void *page_map_at(void *vaddr,
     switch (flags & SIZE_MASK)
     {
         case SIZE_2M:
-            entry |= (paddr & PAGE_ADDRESS_MASK_LARGE)|PAGE_LG;
-            offset = paddr % PAGE_SIZE_LARGE;
+            entry |= page_address(paddr, 2)|PAGE_LG;
+            offset = page_offset(paddr, 2);
             pte = get_kernel_pm2e(vaddr);
             break;
         case SIZE_4K:
-            entry |= (paddr & PAGE_ADDRESS_MASK);
-            offset = paddr % PAGE_SIZE;
+            entry |= page_address(paddr, 1);
+            offset = page_offset(paddr, 1);
             pte = get_kernel_pm1e(vaddr);
             break;
         default:
@@ -359,13 +358,13 @@ static void *page_map_at(void *vaddr,
             pte = NULL;
     }
     
-    if (pte)
+    if (!pte)
     {
-        *pte = entry;
-        return (char *)vaddr + offset;
+        return NULL;
     }
     
-    return NULL;
+    *pte = entry;
+    return (char *)vaddr + offset;
 }
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags)
@@ -400,12 +399,12 @@ phys_addr_t page_alloc(void)
         free_pages--;
     }
     
-    return (phys_addr_t)index * PAGE_SIZE;
+    return (phys_addr_t)index * page_size(1);
 }
 
 void page_free(phys_addr_t paddr)
 {
-    int index = paddr / PAGE_SIZE;
+    int index = paddr / page_size(1);
     
     if ((size_t)index > page_array_entries)
     {
@@ -465,7 +464,7 @@ int anonymous_page_handler(uint32_t code, void *address)
     {
         uint64_t *pm2e = get_kernel_pm2e(address);
         
-        if (! (*pm2e & PAGE_ADDRESS_MASK))
+        if (!page_address(*pm2e, 1))
         {
             // create a page table and install it
             phys_addr_t pm1_phys = page_alloc();
@@ -481,7 +480,7 @@ int anonymous_page_handler(uint32_t code, void *address)
             // zero the page
             memset(pm1, 0, PAGE_SIZE);
             // put the table where it goes
-            *pm2e = (pm1_phys & PAGE_ADDRESS_MASK)|PAGE_WR|PAGE_PR;
+            *pm2e = page_address(pm1_phys, 1)|PAGE_WR|PAGE_PR;
             page_unmap(pm1);
         }
         
@@ -492,10 +491,11 @@ int anonymous_page_handler(uint32_t code, void *address)
             phys_addr_t page_phys = page_alloc();
             if (page_phys)
             {
-                *pm1e = (page_phys & PAGE_ADDRESS_MASK)|PAGE_WR|PAGE_PR;
+                *pm1e = page_address(page_phys, 1)|PAGE_WR|PAGE_PR;
             }
         }
     }
+    
     return 0;
 }
 
