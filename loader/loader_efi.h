@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdnoreturn.h>
 
+#include <kernel/memory/range.h>
+
 extern EFI_SYSTEM_TABLE *e_st;
 extern EFI_BOOT_SERVICES *e_bs;
 extern EFI_RUNTIME_SERVICES *e_rt;
@@ -17,6 +19,8 @@ extern EFI_GRAPHICS_OUTPUT_PROTOCOL *e_graphics_output;
 extern EFI_STATUS e_last_error;
 
 noreturn void efi_exit(EFI_STATUS status);
+
+struct memory_range system_allocate(size_t size);
 
 void *efi_allocate(size_t size);
 void efi_free(void *buffer);

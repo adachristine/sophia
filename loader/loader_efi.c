@@ -11,15 +11,9 @@
 
 #define kernel_path L"\\adasoft\\sophia\\kernel.os"
 
-struct system_buffer
-{
-    EFI_PHYSICAL_ADDRESS base;
-    UINTN size;
-};
-
 struct system_image
 {
-    struct system_buffer buffer;
+    struct memory_range buffer;
     EFI_FILE_PROTOCOL *file;
     Elf64_Ehdr ehdr;
     Elf64_Phdr *phdrs;
@@ -42,30 +36,17 @@ enum page_type
 
 static uint64_t *new_page_table(void)
 {
-    EFI_STATUS status;
-    EFI_PHYSICAL_ADDRESS table_address;
+    struct memory_range table = system_allocate(page_size(1));
+    e_bs->SetMem((void *)table.base, table.size, 0);
 
-    status = e_bs->AllocatePages(AllocateAnyPages,
-                                 SystemMemoryType,
-                                 1,
-                                 &table_address);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"fatal: failed allocating page table: %r", status);
-        efi_exit(status);
-    }
-
-    e_bs->SetMem((void *)table_address, EFI_PAGE_SIZE, 0);
-
-    return (uint64_t *)table_address;
+    return (uint64_t *)table.base;
 }
 
 static uint64_t *get_page_map(void)
 {
     uint64_t map;
     __asm__("mov %%cr3, %0" : "=r"(map));
-    return (uint64_t *)(map & PAGE_ADDRESS_MASK);
+    return (uint64_t *)(page_address(map, 1));
 }
 
 void set_page_map(uint64_t *map)
@@ -134,7 +115,7 @@ static void map_pages(void *map,
                       enum page_type type,
                       size_t size)
 {
-    for (size_t offset = 0; offset < size; offset += EFI_PAGE_SIZE)
+    for (size_t offset = 0; offset < size; offset += page_size(1))
     {
         Print(L"mapping page %16.0lx to %16.0lx\r\n", virt + offset, phys + offset);
         map_page(map, virt + offset, phys + offset, type);
@@ -184,40 +165,14 @@ static void create_kernel_maps(struct system_image *image)
 
 }
 
-static struct system_buffer get_system_buffer(UINTN size)
-{
-    EFI_STATUS status;
-    struct system_buffer buffer;
-
-    buffer.size = size;
-
-    status = e_bs->AllocatePages(AllocateAnyPages,
-                                 SystemMemoryType,
-                                 EFI_SIZE_TO_PAGES(buffer.size),
-                                 &buffer.base);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"error allocating system buffer: %r\r\n", status);
-        buffer.base = 0;
-        buffer.size = 0;
-    }
-
-    Print(L"allocated system buffer at %16.0lx of %d bytes\r\n",
-          buffer.base,
-          buffer.size);
-
-    return buffer;
-}
-
 static void enter_kernel(struct system_image *kernel_image)
 {
     struct efi_boot_data data;
     kernel_entry_func kernel_entry;
     kernel_entry = (kernel_entry_func)(kernel_image->ehdr.e_entry);
 
-    struct system_buffer kernel_entry_stack =
-        get_system_buffer(KERNEL_ENTRY_STACK_SIZE);
+    struct memory_range kernel_entry_stack =
+        system_allocate(KERNEL_ENTRY_STACK_SIZE);
 
     // get a stack here for now idfk
     map_pages(kernel_image->maps,
@@ -401,9 +356,9 @@ static UINTN get_image_size(struct system_image *image)
 
 static bool load_system_image(struct system_image *image)
 {
-    image->buffer = get_system_buffer(get_image_size(image));
+    image->buffer = system_allocate(get_image_size(image));
 
-    if (!image->buffer.base)
+    if (image->buffer.type != SYSTEM_MEMORY)
     {
         return false;
     }
