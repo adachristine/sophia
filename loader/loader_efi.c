@@ -9,16 +9,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define kernel_path L"\\adasoft\\sophia\\kernel.os"
-
 struct system_image
 {
     struct memory_range buffer;
     EFI_FILE_PROTOCOL *file;
     Elf64_Ehdr ehdr;
     Elf64_Phdr *phdrs;
-    uint64_t *maps;
 };
+
+static CHAR16 *kernel_path = L"\\adasoft\\sophia\\kernel.os";
+static struct system_image *kernel_image = NULL;
+static uint64_t *system_page_map = NULL;
 
 static struct system_image *open_system_image(CHAR16 *path);
 static bool load_system_image(struct system_image *image);
@@ -141,7 +142,7 @@ static void create_kernel_maps(struct system_image *image)
                   virt_begin,
                   phys_begin,
                   size);
-            map_pages(image->maps,
+            map_pages(system_page_map,
                       virt_begin,
                       phys_begin,
                       get_page_type(&phdrs[i]),
@@ -151,10 +152,10 @@ static void create_kernel_maps(struct system_image *image)
 
 
     // Create fractal mappings
-    uint64_t *lower_page_dir = get_page_table(image->maps,
+    uint64_t *lower_page_dir = get_page_table(system_page_map,
                                               KERNEL_SPACE_LOWER,
                                               2);
-    uint64_t *upper_page_dir = get_page_table(image->maps,
+    uint64_t *upper_page_dir = get_page_table(system_page_map,
                                               KERNEL_SPACE_UPPER,
                                               2);
 
@@ -175,7 +176,7 @@ static void enter_kernel(struct system_image *kernel_image)
         system_allocate(KERNEL_ENTRY_STACK_SIZE);
 
     // get a stack here for now idfk
-    map_pages(kernel_image->maps,
+    map_pages(system_page_map,
               KERNEL_ENTRY_STACK_BASE,
               kernel_entry_stack.base,
               DATA_PAGE_TYPE,
@@ -198,9 +199,9 @@ static void enter_kernel(struct system_image *kernel_image)
 
     // parasitic map of uefi page tables is this ok???????
     uint64_t *efi_map = get_page_map();
-    kernel_image->maps[0] = efi_map[0];
+    system_page_map[0] = efi_map[0];
 
-    set_page_map(kernel_image->maps);
+    set_page_map(system_page_map);
 
     __asm__
     (
@@ -214,7 +215,7 @@ static void enter_kernel(struct system_image *kernel_image)
 
 void loader_main(void)
 {
-    struct system_image *kernel_image = open_system_image(kernel_path);
+    kernel_image = open_system_image(kernel_path);
 
     Print(L"loading %s\r\n", kernel_path);
 
@@ -230,8 +231,8 @@ void loader_main(void)
         efi_exit(EFI_ABORTED);
     }
     
-    kernel_image->maps = new_page_table();
-    Print(L"kernel pml4 %16.0lx\r\n", kernel_image->maps);
+    system_page_map = new_page_table();
+    Print(L"kernel pml4 %16.0lx\r\n", system_page_map);
     create_kernel_maps(kernel_image);
     Print(L"kernel maps created. entering kernel\r\n");
     enter_kernel(kernel_image);
