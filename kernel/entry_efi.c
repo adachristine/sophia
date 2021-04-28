@@ -1,16 +1,17 @@
-#include <loader/data.h>
+#include "cpu.h"
+#include "serial.h"
+#include "kprint.h"
+#include "memory.h"
+#include "panic.h"
+
+#include <loader/data_efi.h>
+
 #include <kernel/entry.h>
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdnoreturn.h>
-
-#include "cpu.h"
-#include "serial.h"
-#include "kprint.h"
-#include "memory.h"
-#include "panic.h"
 
 static void efi_memory_init(struct efi_memory_map_data *map)
 {

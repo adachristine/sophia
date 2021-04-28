@@ -1,6 +1,7 @@
 #include "loader_efi.h"
 
-#include <loader/data.h>
+#include <loader/data_efi.h>
+
 #include <kernel/entry.h>
 #include <kernel/memory/paging.h>
 
@@ -123,10 +124,7 @@ static void map_pages(void *map,
     }
 }
 
-#define KERNEL_SPACE_LOWER 0xffffffff80000000
-#define KERNEL_SPACE_UPPER 0xffffffffc0000000
-
-static void create_kernel_maps(struct system_image *image)
+static void create_image_maps(struct system_image *image)
 {
     Elf64_Ehdr *ehdr = &image->ehdr;
     Elf64_Phdr *phdrs = image->phdrs;
@@ -149,24 +147,9 @@ static void create_kernel_maps(struct system_image *image)
                       size);
         }
     }
-
-
-    // Create fractal mappings
-    uint64_t *lower_page_dir = get_page_table(system_page_map,
-                                              KERNEL_SPACE_LOWER,
-                                              2);
-    uint64_t *upper_page_dir = get_page_table(system_page_map,
-                                              KERNEL_SPACE_UPPER,
-                                              2);
-
-    upper_page_dir[PAGE_TABLE_INDEX_MASK] =
-        (uint64_t)upper_page_dir|DATA_PAGE_TYPE;
-    upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
-        (uint64_t)lower_page_dir|DATA_PAGE_TYPE;
-
 }
 
-static void enter_kernel(struct system_image *kernel_image)
+static void enter_kernel()
 {
     struct efi_boot_data data;
     kernel_entry_func kernel_entry;
@@ -213,6 +196,27 @@ static void enter_kernel(struct system_image *kernel_image)
     kernel_entry(&data);
 }
 
+#define KERNEL_SPACE_LOWER 0xffffffff80000000
+#define KERNEL_SPACE_UPPER 0xffffffffc0000000
+
+static void create_system_maps()
+{
+    system_page_map = new_page_table();
+
+    // Create fractal mappings
+    uint64_t *lower_page_dir = get_page_table(system_page_map,
+                                              KERNEL_SPACE_LOWER,
+                                              2);
+    uint64_t *upper_page_dir = get_page_table(system_page_map,
+                                              KERNEL_SPACE_UPPER,
+                                              2);
+
+    upper_page_dir[PAGE_TABLE_INDEX_MASK] =
+        (uint64_t)upper_page_dir|DATA_PAGE_TYPE;
+    upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
+        (uint64_t)lower_page_dir|DATA_PAGE_TYPE;
+}
+
 void loader_main(void)
 {
     kernel_image = open_system_image(kernel_path);
@@ -231,11 +235,11 @@ void loader_main(void)
         efi_exit(EFI_ABORTED);
     }
     
-    system_page_map = new_page_table();
+    create_system_maps();
     Print(L"kernel pml4 %16.0lx\r\n", system_page_map);
-    create_kernel_maps(kernel_image);
+    create_image_maps(kernel_image);
     Print(L"kernel maps created. entering kernel\r\n");
-    enter_kernel(kernel_image);
+    enter_kernel();
 
     efi_exit(EFI_ABORTED);
 }
@@ -413,7 +417,7 @@ static struct efi_memory_map_data *get_memory_map_data(void)
 
     if (status == EFI_BUFFER_TOO_SMALL)
     {
-        map = efi_allocate(sizeof(*map));
+        map = efi_allocate(sizeof(*map) + mapsize);
     }
 
     if (map)
@@ -456,23 +460,24 @@ static struct efi_framebuffer_data *get_framebuffer_data(void)
         framebuffer->bitmask = mode->Info->PixelInformation;
         framebuffer->width = mode->Info->HorizontalResolution;
         framebuffer->height = mode->Info->VerticalResolution;
-        framebuffer->base = mode->FrameBufferBase;
-        framebuffer->size = mode->FrameBufferSize;
-        framebuffer->pixel_format = mode->Info->PixelFormat;
+        framebuffer->buffer.base = mode->FrameBufferBase;
+        framebuffer->buffer.size = mode->FrameBufferSize;
+        framebuffer->buffer.type = RESERVED_MEMORY;
+        framebuffer->pxformat = mode->Info->PixelFormat;
 
-        switch (framebuffer->pixel_format)
+        switch (framebuffer->pxformat)
         {
             //falthrough
             case PixelBlueGreenRedReserved8BitPerColor:
             case PixelRedGreenBlueReserved8BitPerColor:
-                framebuffer->pixel_size = sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL);
+                framebuffer->pxsize = sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL);
                 break;
             default:
                 // TODO: calculate pixel size for bitmask format
-                framebuffer->pixel_size = 0;
+                framebuffer->pxsize = 0;
         }
 
-        framebuffer->pitch = framebuffer->width * framebuffer->pixel_size;
+        framebuffer->pitch = framebuffer->width * framebuffer->pxsize;
     }
     else
     {

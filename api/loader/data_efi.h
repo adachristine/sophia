@@ -1,9 +1,19 @@
 #pragma once
 
+#include <kernel/memory/range.h>
+
 #include <efi.h>
+
+#include <stddef.h>
 
 #define EfiUserMemoryType (EFI_MEMORY_TYPE)0x80000000
 #define SystemMemoryType EfiUserMemoryType | 0x01
+
+enum efi_boot_data_type
+{
+    MEMORY_MAP_DATA,
+    FRAMEBUFFER_DATA,
+};
 
 struct efi_memory_map_data
 {
@@ -16,14 +26,13 @@ struct efi_memory_map_data
 
 struct efi_framebuffer_data
 {
-    EFI_PIXEL_BITMASK bitmask;
-    EFI_PHYSICAL_ADDRESS base;
-    UINTN size;
+    struct memory_range buffer;
     UINT32 width;
     UINT32 height;
     UINT32 pitch;
-    EFI_GRAPHICS_PIXEL_FORMAT pixel_format;
-    UINT8 pixel_size;
+    UINT8 pxsize;
+    EFI_PIXEL_BITMASK bitmask;
+    EFI_GRAPHICS_PIXEL_FORMAT pxformat;
 };
 
 struct efi_boot_data

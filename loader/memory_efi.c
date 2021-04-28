@@ -1,6 +1,6 @@
 #include "loader_efi.h"
 
-#include <loader/data.h>
+#include <loader/data_efi.h>
 #include <kernel/memory/paging.h>
 
 struct memory_range system_allocate(size_t size)

@@ -468,20 +468,20 @@ int anonymous_page_handler(uint32_t code, void *address)
         {
             // create a page table and install it
             phys_addr_t pm1_phys = page_alloc();
-            uint64_t *pm1;
             if (pm1_phys)
             {
+                uint64_t *pm1;
                 pm1 = page_map_at(temp, pm1_phys, CONTENT_RWDATA|SIZE_2M);
+                // zero the page
+                memset(pm1, 0, PAGE_SIZE);
+                // put the table where it goes
+                *pm2e = page_address(pm1_phys, 1)|PAGE_WR|PAGE_PR;
+                page_unmap(pm1);
             }
             else
             {
                 panic(OUT_OF_MEMORY);
             }
-            // zero the page
-            memset(pm1, 0, PAGE_SIZE);
-            // put the table where it goes
-            *pm2e = page_address(pm1_phys, 1)|PAGE_WR|PAGE_PR;
-            page_unmap(pm1);
         }
         
         uint64_t *pm1e = get_kernel_pm1e(address);
