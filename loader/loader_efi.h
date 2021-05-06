@@ -1,13 +1,16 @@
 #pragma once
 
+#include <kernel/memory/range.h>
+#include <kernel/memory/paging.h>
+
+#include <elf/elf64.h>
+
 #include <efi.h>
 #include <efilib.h>
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdnoreturn.h>
-
-#include <kernel/memory/range.h>
-#include <kernel/memory/paging.h>
 
 enum page_type
 {
@@ -15,6 +18,14 @@ enum page_type
     CODE_PAGE_TYPE = PAGE_PR,
     RODATA_PAGE_TYPE = PAGE_PR|PAGE_NX,
     DATA_PAGE_TYPE = PAGE_PR|PAGE_WR|PAGE_NX
+};
+
+struct system_image
+{
+    struct memory_range buffer;
+    EFI_FILE_PROTOCOL *file;
+    Elf64_Ehdr ehdr;
+    Elf64_Phdr *phdrs;
 };
 
 extern EFI_SYSTEM_TABLE *e_st;
@@ -44,5 +55,10 @@ void *paging_map_pages(void *vaddr,
 void *paging_map_range(void *vaddr,
                        struct memory_range *range,
                        enum page_type type);
+
+struct system_image *system_image_open(CHAR16 *path);
+bool system_image_load(struct system_image *image);
+void system_image_map(struct system_image *image);
+
 void loader_main(void);
 

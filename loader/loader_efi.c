@@ -4,68 +4,12 @@
 
 #include <kernel/entry.h>
 
-#include <elf/elf64.h>
-
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdnoreturn.h>
-
-struct system_image
-{
-    struct memory_range buffer;
-    EFI_FILE_PROTOCOL *file;
-    Elf64_Ehdr ehdr;
-    Elf64_Phdr *phdrs;
-};
-
 static CHAR16 *kernel_path = L"\\adasoft\\sophia\\kernel.os";
 static struct system_image *kernel_image = NULL;
 
-static struct system_image *open_system_image(CHAR16 *path);
-static bool load_system_image(struct system_image *image);
 static struct efi_memory_map_data *get_memory_map_data(void);
 static struct efi_framebuffer_data *get_framebuffer_data(void);
 static void *get_acpi_rsdp(void);
-
-enum page_type get_page_type(Elf64_Phdr *phdr)
-{
-    switch (phdr->p_flags)
-    {
-        case (PF_R|PF_X):
-            return CODE_PAGE_TYPE;
-        case (PF_R):
-            return RODATA_PAGE_TYPE;
-        case (PF_R|PF_W):
-            return DATA_PAGE_TYPE;
-    }
-
-    return INVALID_PAGE_TYPE;
-}
-
-static void create_image_maps(struct system_image *image)
-{
-    Elf64_Ehdr *ehdr = &image->ehdr;
-    Elf64_Phdr *phdrs = image->phdrs;
-
-    for (int i = 0; i < ehdr->e_phnum; i++)
-    {
-        if (phdrs[i].p_type == PT_LOAD)
-        {
-            void *virt_begin = (void *)phdrs[i].p_vaddr;
-            uint64_t phys_begin = image->buffer.base + phdrs[i].p_paddr;
-            size_t size = phdrs[i].p_memsz;
-            Print(L"mapping segment %16.0lx to %16.0lx %d bytes\r\n",
-                  virt_begin,
-                  phys_begin,
-                  size);
-            
-            paging_map_pages(virt_begin,
-                             phys_begin,
-                             get_page_type(&phdrs[i]),
-                             size);
-        }
-    }
-}
 
 noreturn static void enter_kernel()
 {
@@ -113,11 +57,11 @@ noreturn static void enter_kernel()
 
 void loader_main(void)
 {
-    kernel_image = open_system_image(kernel_path);
+    kernel_image = system_image_open(kernel_path);
 
     Print(L"loading %s\r\n", kernel_path);
 
-    if (load_system_image(kernel_image))
+    if (system_image_load(kernel_image))
     {
         Print(L"loaded kernel image at base %16.0lx size %d bytes\r\n",
               kernel_image->buffer.base,
@@ -130,176 +74,11 @@ void loader_main(void)
     }
     
     paging_init();
-    create_image_maps(kernel_image);
+    system_image_map(kernel_image);
     Print(L"kernel maps created. entering kernel\r\n");
     enter_kernel();
 
     efi_exit(EFI_ABORTED);
-}
-
-static bool validate_image(Elf64_Ehdr *ehdr)
-{
-    if (ehdr->e_ident[EI_MAG0] != ELFMAG0 ||
-        ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
-        ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
-        ehdr->e_ident[EI_MAG3] != ELFMAG3 ||
-        ehdr->e_ident[EI_CLASS] != ELFCLASS64 ||
-        ehdr->e_ident[EI_DATA] != ELFDATA2LSB ||
-        ehdr->e_ident[EI_VERSION] != EV_CURRENT ||
-        ehdr->e_machine != EM_X86_64)
-    {
-        Print(L"invalid image format\r\n");
-        return false;
-    }
-
-    Print(L"elf x64 image detected\r\n");
-
-    return true;
-}
-
-static struct system_image *open_system_image(CHAR16 *path)
-{
-    EFI_STATUS status;
-    EFI_FILE_PROTOCOL *root;
-    EFI_FILE_PROTOCOL *file;
-    struct system_image *image = NULL;
-
-    status = e_system_partition->OpenVolume(e_system_partition, &root);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"failed opening system partition root: %r\r\n", status);
-        return NULL;
-    }
-
-    status = root->Open(root, &file, path, EFI_FILE_MODE_READ, 0);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"failed opening image file %s: %r\r\n", path, status);
-        return NULL;
-    }
-
-    image = efi_allocate(sizeof(*image));
-
-    if (!image)
-    {
-        Print(L"failed allocating image data: %r\r\n", e_last_error);
-        goto failure;
-    }
-
-    image->file = file;
-
-    UINTN ehdr_size = sizeof(image->ehdr);
-    status = file->Read(file, &ehdr_size, &image->ehdr);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"failed reading image file %s: %r\r\n", path, status);
-        goto failure;
-    }
-
-    if (!validate_image(&image->ehdr))
-    {
-        Print(L"failed validating image file %s: %r\r\n", path, status);
-        goto failure;
-    }
-
-    UINTN phdrs_size = image->ehdr.e_phentsize * image->ehdr.e_phnum;
-    image->phdrs = efi_allocate(phdrs_size);
-
-    if (!image->phdrs)
-    {
-        Print(L"failed allocating segment data: %r", e_last_error);
-        goto failure;
-    }
-
-    status = file->Read(file, &phdrs_size, image->phdrs);
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"failed reading segment data: %r", status);
-        goto failure;
-    }
-
-    return image;
-
-failure:
-    file->Close(file);
-    return NULL;
-}
-
-static UINTN get_image_size(struct system_image *image)
-{
-    UINTN size = 0;
-    Elf64_Phdr *phdrs = image->phdrs;
-
-    for (int i = 0; i < image->ehdr.e_phnum; i++)
-    {
-        if (phdrs[i].p_type != PT_LOAD)
-        {
-            continue;
-        }
-
-        if (phdrs[i].p_paddr + phdrs[i].p_memsz > size)
-        {
-            size = phdrs[i].p_paddr + phdrs[i].p_memsz;
-            if (phdrs[i].p_align > 1)
-            {
-                size = (size + phdrs[i].p_align - 1) & ~(phdrs[i].p_align - 1);
-            }
-        }
-    }
-
-    return size;
-}
-
-static bool load_system_image(struct system_image *image)
-{
-    image->buffer = system_allocate(get_image_size(image));
-
-    if (image->buffer.type != SYSTEM_MEMORY)
-    {
-        return false;
-    }
-
-    e_bs->SetMem((VOID *)image->buffer.base, image->buffer.size, 0);
-
-    Elf64_Ehdr *ehdr = &image->ehdr;
-    Elf64_Phdr *phdrs = image->phdrs;
-
-    Print(L"found %d segments in image\r\n", ehdr->e_phnum);
-
-    EFI_STATUS status = EFI_SUCCESS;
-
-    for (UINTN i = 0; i < ehdr->e_phnum && !EFI_ERROR(status); i++)
-    {
-        switch (phdrs[i].p_type)
-        {
-            case PT_LOAD:
-                Print(L"loadable segment %16.0lx at offset %x of %d bytes\r\n",
-                      phdrs[i].p_vaddr,
-                      phdrs[i].p_offset,
-                      phdrs[i].p_memsz);
-
-                void *segment = (void *)(image->buffer.base + phdrs[i].p_paddr);
-                UINTN segment_size = phdrs[i].p_filesz;
-
-                image->file->SetPosition(image->file, phdrs[i].p_offset);
-                status = image->file->Read(image->file, &segment_size, segment);
-                break;
-            default:
-                continue;
-        }
-    }
-
-    if (EFI_ERROR(status))
-    {
-        Print(L"failure reading segment from file: %r\r\n", status);
-        return false;
-    }
-
-    return true;
 }
 
 static struct efi_memory_map_data *get_memory_map_data(void)
