@@ -18,6 +18,7 @@ struct memory_range system_allocate(size_t size)
 
     if (EFI_ERROR(status))
     {
+        Print(L"error allocating range: %r\r\n", status);
         e_last_error = status;
         buffer.type = UNUSABLE_MEMORY;
     }
@@ -52,4 +53,3 @@ void efi_free(void *buffer)
         e_last_error = status;
     }
 }
-

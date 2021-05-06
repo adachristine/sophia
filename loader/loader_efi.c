@@ -3,12 +3,12 @@
 #include <loader/data_efi.h>
 
 #include <kernel/entry.h>
-#include <kernel/memory/paging.h>
 
 #include <elf/elf64.h>
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdnoreturn.h>
 
 struct system_image
 {
@@ -20,81 +20,12 @@ struct system_image
 
 static CHAR16 *kernel_path = L"\\adasoft\\sophia\\kernel.os";
 static struct system_image *kernel_image = NULL;
-static uint64_t *system_page_map = NULL;
 
 static struct system_image *open_system_image(CHAR16 *path);
 static bool load_system_image(struct system_image *image);
 static struct efi_memory_map_data *get_memory_map_data(void);
 static struct efi_framebuffer_data *get_framebuffer_data(void);
 static void *get_acpi_rsdp(void);
-
-enum page_type
-{
-    INVALID_PAGE_TYPE = 0x0,
-    CODE_PAGE_TYPE = PAGE_PR,
-    RODATA_PAGE_TYPE = PAGE_PR|PAGE_NX,
-    DATA_PAGE_TYPE = PAGE_PR|PAGE_WR|PAGE_NX
-};
-
-static uint64_t *new_page_table(void)
-{
-    struct memory_range table = system_allocate(page_size(1));
-    e_bs->SetMem((void *)table.base, table.size, 0);
-
-    return (uint64_t *)table.base;
-}
-
-static uint64_t *get_page_map(void)
-{
-    uint64_t map;
-    __asm__("mov %%cr3, %0" : "=r"(map));
-    return (uint64_t *)(page_address(map, 1));
-}
-
-void set_page_map(uint64_t *map)
-{
-    __asm__("cli");
-    __asm__("mov %0, %%cr3" :: "r"(map));
-}
-
-static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
-{
-    if ((level < 1) || (level > PAGE_MAP_LEVELS))
-    {
-        return NULL;
-    }
-
-    for (int i = PAGE_MAP_LEVELS; i > level; i--)
-    {
-        if (!map[pte_index(virt, i)])
-        {
-            uint64_t *next_map = new_page_table();
-            map[pte_index(virt, i)] = (uint64_t)next_map|PAGE_PR|PAGE_WR;
-            map = next_map;
-        }
-        else
-        {
-            map = (uint64_t *)page_address(map[pte_index(virt, i)], 1);
-        }
-    }
-
-    return map;
-}
-
-static uint64_t *get_page_entry(uint64_t *map, uint64_t virt)
-{
-    int level = 1;
-    uint64_t *table = get_page_table(map, virt, level);
-    return &table[pte_index(virt, level)];
-}
-
-static void map_page(void *map,
-                     uint64_t virt,
-                     uint64_t phys,
-                     enum page_type type)
-{
-    *get_page_entry(map, virt) = phys | type;
-}
 
 enum page_type get_page_type(Elf64_Phdr *phdr)
 {
@@ -111,19 +42,6 @@ enum page_type get_page_type(Elf64_Phdr *phdr)
     return INVALID_PAGE_TYPE;
 }
 
-static void map_pages(void *map,
-                      uint64_t virt,
-                      uint64_t phys,
-                      enum page_type type,
-                      size_t size)
-{
-    for (size_t offset = 0; offset < size; offset += page_size(1))
-    {
-        Print(L"mapping page %16.0lx to %16.0lx\r\n", virt + offset, phys + offset);
-        map_page(map, virt + offset, phys + offset, type);
-    }
-}
-
 static void create_image_maps(struct system_image *image)
 {
     Elf64_Ehdr *ehdr = &image->ehdr;
@@ -133,23 +51,23 @@ static void create_image_maps(struct system_image *image)
     {
         if (phdrs[i].p_type == PT_LOAD)
         {
-            uint64_t virt_begin = phdrs[i].p_vaddr;
+            void *virt_begin = (void *)phdrs[i].p_vaddr;
             uint64_t phys_begin = image->buffer.base + phdrs[i].p_paddr;
             size_t size = phdrs[i].p_memsz;
             Print(L"mapping segment %16.0lx to %16.0lx %d bytes\r\n",
                   virt_begin,
                   phys_begin,
                   size);
-            map_pages(system_page_map,
-                      virt_begin,
-                      phys_begin,
-                      get_page_type(&phdrs[i]),
-                      size);
+            
+            paging_map_pages(virt_begin,
+                             phys_begin,
+                             get_page_type(&phdrs[i]),
+                             size);
         }
     }
 }
 
-static void enter_kernel()
+noreturn static void enter_kernel()
 {
     struct efi_boot_data data;
     kernel_entry_func kernel_entry;
@@ -159,12 +77,9 @@ static void enter_kernel()
         system_allocate(KERNEL_ENTRY_STACK_SIZE);
 
     // get a stack here for now idfk
-    map_pages(system_page_map,
-              KERNEL_ENTRY_STACK_BASE,
-              kernel_entry_stack.base,
-              DATA_PAGE_TYPE,
-              kernel_entry_stack.size);
-
+    paging_map_range(KERNEL_ENTRY_STACK_BASE,
+                     &kernel_entry_stack,
+                     DATA_PAGE_TYPE);
 
     data.system_table = e_st;
     data.framebuffer = get_framebuffer_data();
@@ -180,12 +95,10 @@ static void enter_kernel()
         efi_exit(status);
     }
 
-    // parasitic map of uefi page tables is this ok???????
-    uint64_t *efi_map = get_page_map();
-    system_page_map[0] = efi_map[0];
-
-    set_page_map(system_page_map);
-
+    // enter the kernel address environment
+    paging_enter();
+    
+    // set the kernel entry stack.
     __asm__
     (
         "mov %0, %%rsp"
@@ -194,27 +107,8 @@ static void enter_kernel()
     );
 
     kernel_entry(&data);
-}
-
-#define KERNEL_SPACE_LOWER 0xffffffff80000000
-#define KERNEL_SPACE_UPPER 0xffffffffc0000000
-
-static void create_system_maps()
-{
-    system_page_map = new_page_table();
-
-    // Create fractal mappings
-    uint64_t *lower_page_dir = get_page_table(system_page_map,
-                                              KERNEL_SPACE_LOWER,
-                                              2);
-    uint64_t *upper_page_dir = get_page_table(system_page_map,
-                                              KERNEL_SPACE_UPPER,
-                                              2);
-
-    upper_page_dir[PAGE_TABLE_INDEX_MASK] =
-        (uint64_t)upper_page_dir|DATA_PAGE_TYPE;
-    upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
-        (uint64_t)lower_page_dir|DATA_PAGE_TYPE;
+    
+    while(true);
 }
 
 void loader_main(void)
@@ -235,8 +129,7 @@ void loader_main(void)
         efi_exit(EFI_ABORTED);
     }
     
-    create_system_maps();
-    Print(L"kernel pml4 %16.0lx\r\n", system_page_map);
+    paging_init();
     create_image_maps(kernel_image);
     Print(L"kernel maps created. entering kernel\r\n");
     enter_kernel();
@@ -352,7 +245,9 @@ static UINTN get_image_size(struct system_image *image)
         {
             size = phdrs[i].p_paddr + phdrs[i].p_memsz;
             if (phdrs[i].p_align > 1)
-            size = (size + phdrs[i].p_align - 1) & ~(phdrs[i].p_align - 1);
+            {
+                size = (size + phdrs[i].p_align - 1) & ~(phdrs[i].p_align - 1);
+            }
         }
     }
 

@@ -7,6 +7,15 @@
 #include <stdnoreturn.h>
 
 #include <kernel/memory/range.h>
+#include <kernel/memory/paging.h>
+
+enum page_type
+{
+    INVALID_PAGE_TYPE = 0x0,
+    CODE_PAGE_TYPE = PAGE_PR,
+    RODATA_PAGE_TYPE = PAGE_PR|PAGE_NX,
+    DATA_PAGE_TYPE = PAGE_PR|PAGE_WR|PAGE_NX
+};
 
 extern EFI_SYSTEM_TABLE *e_st;
 extern EFI_BOOT_SERVICES *e_bs;
@@ -25,5 +34,15 @@ struct memory_range system_allocate(size_t size);
 void *efi_allocate(size_t size);
 void efi_free(void *buffer);
 
+void paging_init(void);
+void paging_enter(void);
+void *paging_map_page(void *vaddr, phys_addr_t paddr, enum page_type type);
+void *paging_map_pages(void *vaddr,
+                       phys_addr_t paddr,
+                       enum page_type type,
+                       size_t size);
+void *paging_map_range(void *vaddr,
+                       struct memory_range *range,
+                       enum page_type type);
 void loader_main(void);
 

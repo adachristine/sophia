@@ -34,6 +34,8 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
     e_system_partition = open_system_partition();
     e_graphics_output = open_graphics_output();
 
+    WaitForSingleEvent(e_st->ConIn->WaitForKey, 0);
+    
     loader_main();
 
     efi_exit(EFI_ABORTED);
