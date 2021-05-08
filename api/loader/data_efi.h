@@ -6,13 +6,14 @@
 
 #include <stddef.h>
 
-#define EfiUserMemoryType (EFI_MEMORY_TYPE)0x80000000
-#define SystemMemoryType EfiUserMemoryType | 0x01
+#define UserMemoryType ((EFI_MEMORY_TYPE)0x80000000)
+#define SystemMemoryType (UserMemoryType|0x01)
 
 enum efi_boot_data_type
 {
     MEMORY_MAP_DATA,
     FRAMEBUFFER_DATA,
+    ACPI_DATA,
 };
 
 struct efi_memory_map_data
@@ -35,11 +36,14 @@ struct efi_framebuffer_data
     EFI_GRAPHICS_PIXEL_FORMAT pxformat;
 };
 
-struct efi_boot_data
+struct efi_acpi_data
 {
-    EFI_SYSTEM_TABLE *system_table;
-    struct efi_memory_map_data *memory_map;
-    struct efi_framebuffer_data *framebuffer;
-    void *acpi_rsdp;
+    void *rsdp;
 };
 
+struct efi_boot_data
+{
+    struct efi_memory_map_data *memory_map;
+    struct efi_framebuffer_data *framebuffer;
+    struct efi_acpi_data *acpi;
+};

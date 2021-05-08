@@ -9,7 +9,7 @@ static struct system_image *kernel_image = NULL;
 
 static struct efi_memory_map_data *get_memory_map_data(void);
 static struct efi_framebuffer_data *get_framebuffer_data(void);
-static void *get_acpi_rsdp(void);
+static void *get_acpi_data(void);
 
 noreturn static void enter_kernel()
 {
@@ -26,8 +26,8 @@ noreturn static void enter_kernel()
                      DATA_PAGE_TYPE);
 
     data.system_table = e_st;
+    data.acpi = get_acpi_data();
     data.framebuffer = get_framebuffer_data();
-    data.acpi_rsdp = get_acpi_rsdp();
     data.memory_map = get_memory_map_data();
 
     EFI_STATUS status = e_bs->ExitBootServices(e_image_handle,
@@ -162,18 +162,18 @@ static struct efi_framebuffer_data *get_framebuffer_data(void)
     return framebuffer;
 }
 
-static void *get_acpi_rsdp(void)
+static void *get_acpi_data(void)
 {
+    struct efi_acpi_data *acpi = efi_allocate(sizeof(*acpi));
+    
     EFI_GUID acpi_20_guid = ACPI_20_TABLE_GUID;
 
-    for (UINTN i = 0; i < e_st->NumberOfTableEntries; i++)
+    for (UINTN i = 0; acpi && i < e_st->NumberOfTableEntries; i++)
     {
         if (!CompareGuid(&acpi_20_guid, &e_st->ConfigurationTable[i].VendorGuid))
         {
-            Print(L"acpi rsdp: 0x%16.0lx\r\n",
-                  e_st->ConfigurationTable[i].VendorTable);
-            
-            return e_st->ConfigurationTable[i].VendorTable;
+            acpi->rsdp = e_st->ConfigurationTable[i].VendorTable;
+            return acpi;
         }
     }
 
