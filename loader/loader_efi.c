@@ -25,7 +25,6 @@ noreturn static void enter_kernel()
                      &kernel_entry_stack,
                      DATA_PAGE_TYPE);
 
-    data.system_table = e_st;
     data.acpi = get_acpi_data();
     data.framebuffer = get_framebuffer_data();
     data.memory_map = get_memory_map_data();
