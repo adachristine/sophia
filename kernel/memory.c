@@ -101,10 +101,11 @@ static struct memory_range init_grab_pages(struct memory_range *ranges,
             request.base = ranges[i].base;
             ranges[i].base += request.size;
             ranges[i].size -= request.size;
-            break;
+            return request;
         }
     }
     
+    request.type = INVALID_MEMORY;
     return request;
 }
 
@@ -286,12 +287,6 @@ static struct memory_space init_anonymous_space(void *base, void *head)
     return space;
 }
 
-static void init_heap_space(struct memory_space *heap)
-{
-    // the heap is anonymous space that will grow as-needed.
-    (void)heap;
-}
-
 void memory_init(struct memory_range *ranges, int count)
 {
     init_create_page_array(ranges, count);
@@ -316,8 +311,6 @@ void memory_init(struct memory_range *ranges, int count)
     kernel_pagemap_space.prev = &kernel_stack_space;
     
     root_memory_space = &kernel_image_space;
-    
-    init_heap_space(&kernel_heap_space);
 }
 
 static void *page_map_at(void *vaddr,
@@ -417,6 +410,28 @@ void page_free(phys_addr_t paddr)
     free_pages++;
 }
 
+void *heap_alloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
+
+void heap_free(void *block)
+{
+    (void)block;
+}
+
+void *memory_alloc(size_t size)
+{
+    (void)size;
+    return NULL;
+}
+
+void memory_free(void *block)
+{
+    (void)block;
+}
+
 static uint64_t *get_kernel_pm1e(void *vaddr)
 {
     return &kernel_pm1[kpm1_index(vaddr)];
@@ -492,6 +507,8 @@ int anonymous_page_handler(uint32_t code, void *address)
             if (page_phys)
             {
                 *pm1e = page_address(page_phys, 1)|PAGE_WR|PAGE_PR;
+                // clear a potentially dirty page.
+                memset((void *)page_address(address, 1), 0, page_size(1));
             }
         }
     }
