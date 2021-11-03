@@ -65,7 +65,7 @@ static EFI_LOADED_IMAGE_PROTOCOL *open_loaded_image(void)
                                 (void **)&image,
                                 e_image_handle,
                                 NULL,
-                                EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+                                EFI_OPEN_PROTOCOL_GET_PROTOCOL);
     
     if (EFI_ERROR(status))
     {
@@ -92,7 +92,7 @@ static EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *open_system_partition(void)
                                (void **)&partition,
                                e_image_handle,
                                NULL,
-                               EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL);
+                               EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 
     if (EFI_ERROR(status))
     {
