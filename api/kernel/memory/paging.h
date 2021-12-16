@@ -31,3 +31,4 @@
 #define page_address(a, l) ((uintptr_t)a & ~(page_size(l) - 1))
 #define page_offset(a, l) ((uintptr_t)a & (page_size(l) - 1))
 #define page_count(s, l) (((s + page_size(l) - 1) & ~(page_size(l) - 1)) / page_size(l))
+

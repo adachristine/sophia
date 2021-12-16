@@ -11,6 +11,7 @@ enum memory_range_type
     RESERVED_MEMORY,
     SYSTEM_MEMORY,
     AVAILABLE_MEMORY,
+    INVALID_MEMORY = 0xff
 };
 
 struct memory_range
@@ -19,3 +20,4 @@ struct memory_range
     phys_addr_t base;
     size_t size;
 };
+

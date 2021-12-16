@@ -5,3 +5,4 @@
 #define KERNEL_ENTRY_STACK_BASE ((char *)KERNEL_ENTRY_STACK_HEAD - KERNEL_ENTRY_STACK_SIZE)
 
 typedef void (*kernel_entry_func)(void *data);
+
