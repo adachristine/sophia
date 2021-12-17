@@ -22,7 +22,7 @@ CPPFLAGS += -I$(EFIAPIDIR) -I$(EFIAPIDIR)/protocol -I$(EFIAPIDIR)/$(GNUEFIARCH) 
             -DGNU_EFI_USE_MS_ABI -DEFI_CALL_WRAPPER -DEFI_DEBUG
 
 CFLAGS += -fPIC -fshort-wchar -maccumulate-outgoing-args -mno-avx -mno-sse \
-          -mno-mmx
+          -mno-mmx -funsigned-char -Wno-pointer-sign
 
 OBJCOPY.efi = $(OBJCOPY) -j .text -j .sdata -j .data -j .dynamic \
 			-j .dynsm -j .rel -j .rela -j .reloc \

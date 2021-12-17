@@ -18,6 +18,9 @@ typedef struct Elf64_Shdr Elf64_Shdr;
 typedef struct Elf64_Sym Elf64_Sym;
 typedef struct Elf64_Dyn Elf64_Dyn;
 
+typedef struct Elf64_Rel Elf64_Rel;
+typedef struct Elf64_Rela Elf64_Rela;
+
 #define EM_X86_64 62
 
 struct Elf64_Ehdr
@@ -82,5 +85,24 @@ struct Elf64_Dyn
         Elf64_Xword d_val;
         Elf64_Addr d_ptr;
     };
+};
+
+#define ELF64_R_SYM(info) ((info)>>32)
+#define ELF64_R_TYPE(info) ((Elf64_Word)(info))
+#define ELF64_R_INFO(sym, type) (((Elf64_Xword)(sym)<<32)+(Elf64_Xword)(type))
+
+#define R_AMD64_RELATIVE 8
+
+struct Elf64_Rel
+{
+    Elf64_Addr r_offset;
+    Elf64_Xword r_info;
+};
+
+struct Elf64_Rela
+{
+    Elf64_Addr r_offset;
+    Elf64_Xword r_info;
+    Elf64_Sxword r_addend;
 };
 

@@ -49,7 +49,11 @@ EFI_STATUS efi_shim_entry(struct efi_loader_image *image,
      * 3. exit boot services
      * 5. ???????????
      */
-    
+
+    void *image_base = (void *)image->buffer_base;
+
+    elf_reloc(image_base);
+
     EFI_STATUS status;
 
     if (!image)

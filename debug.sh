@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 make -C loader &&
+make -C shim &&
 make -C kernel &&
 
 ./image.sh &&

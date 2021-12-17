@@ -15,11 +15,11 @@ CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden \
 
 LIBDIRS += -L$(dir $(shell $(CC) -print-libgcc-file-name))
 LDSCRIPT := shim.ld
-LDFLAGS += -z max-page-size=4096 --export-dynamic
+LDFLAGS += -z max-page-size=4096 --export-dynamic -pic --no-dynamic-linker
 LOADLIBES := -lgcc
 
-OBJS := entry.o memcmp.o memcpy.o memmove.o memset.o
-$(OBJS): CFLAGS += -fPIC -fPIE
+OBJS := entry.o elf.o memcmp.o memcpy.o memmove.o memset.o
+$(OBJS): CFLAGS += -fPIC
 
 DEPS := $(patsubst %.o,%.d,$(OBJS))
 

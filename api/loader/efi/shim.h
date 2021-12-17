@@ -13,8 +13,6 @@
 #define OsVendorMemoryType(t) ((EFI_MEMORY_TYPE)(0x80000000|t))
 #define SystemMemoryType OsVendorMemoryType(1)
 
-struct efi_loader_image;
-
 struct efi_loader_image
 {
     CHAR16 *path;

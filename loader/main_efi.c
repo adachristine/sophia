@@ -145,7 +145,8 @@ EFI_STATUS open_image(struct efi_loader_image *image)
                         &ehdr_size, 
                         &ehdr))))
     {
-        if (elf_validate(&ehdr, ET_EXEC, EM_X86_64))
+        if (elf_validate(&ehdr, ET_EXEC, EM_X86_64) ||
+                elf_validate(&ehdr, ET_DYN, EM_X86_64))
         {
             phdrs_size = ehdr.e_phentsize * ehdr.e_phnum;
             phdrs = AllocatePool(phdrs_size);
