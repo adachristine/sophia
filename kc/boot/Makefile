@@ -1,6 +1,6 @@
-include ../defaults.mk
+include ../../defaults.mk
 
-VPATH := ../lib
+VPATH := ../../lib ../
 
 TARGET := efi.os
 .DEFAULT: $(TARGET)
@@ -9,12 +9,12 @@ TARGET := efi.os
 
 EFIAPIDIR := /usr/local/include/efi
 
-CPPFLAGS += -I../api -I$(EFIAPIDIR) -I$(EFIAPIDIR)/$(ARCH) -I$(EFIAPIDIR)/protocol
+CPPFLAGS += -I../../api -I$(EFIAPIDIR) -I$(EFIAPIDIR)/$(ARCH) -I$(EFIAPIDIR)/protocol
 CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden \
 	  -g -fshort-wchar -mgeneral-regs-only
 
 LIBDIRS += -L$(dir $(shell $(CC) -print-libgcc-file-name))
-LDSCRIPT := ../lib/component.ld
+LDSCRIPT := ../component.ld
 LDFLAGS += -z max-page-size=4096 --export-dynamic -pic --no-dynamic-linker
 LOADLIBES := -lgcc
 
@@ -30,7 +30,7 @@ $(TARGET): $(OBJS)
 CLEANLIST := $(wildcard $(OBJS) $(TARGET)) 
 DCLEANLIST := $(wildcard $(DEPS))
 
-include ../rules.mk
+include ../../rules.mk
 -include $(DEPS)
 
 .DEFAULT: $(TARGET)
