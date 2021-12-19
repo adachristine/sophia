@@ -16,7 +16,6 @@
 struct efi_loader_image
 {
     CHAR16 *path;
-    EFI_HANDLE image_handle;
     EFI_SYSTEM_TABLE *system_table;
     EFI_FILE_PROTOCOL *root;
     EFI_FILE_PROTOCOL *file;
@@ -32,6 +31,9 @@ typedef EFI_STATUS (*efi_page_free_func)(EFI_PHYSICAL_ADDRESS base, UINTN size);
 
 struct efi_loader_interface
 {
+    EFI_HANDLE image_handle;
+    EFI_SYSTEM_TABLE *system_table;
+
     efi_page_alloc_func page_alloc;
     efi_page_free_func page_free;
 

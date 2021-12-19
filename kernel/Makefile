@@ -5,11 +5,6 @@ VPATH := ../lib
 TARGET := kernel.os
 .DEFAULT: $(TARGET)
 
-# EFI API for temporary things
-
-EFIAPIDIR := /usr/local/include/efi
-
-CPPFLAGS += -I../api -I$(EFIAPIDIR) -I$(EFIAPIDIR)/$(ARCH) -I$(EFIAPIDIR)/protocol
 CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
 
 LIBDIRS += -L$(dir $(shell $(CC) -print-libgcc-file-name))
@@ -18,7 +13,7 @@ LDFLAGS += -z max-page-size=4096 --export-dynamic
 LOADLIBES := -lgcc
 
 SOBJS := 
-GOBJS := entry_efi.o kprint.o serial.o port.o main.o memory.o \
+GOBJS := entry.o kprint.o serial.o port.o main.o memory.o \
 	 memset.o memcpy.o memmove.o memcmp.o cpu.o exceptions.o \
 	 panic.o
 IOBJS :=

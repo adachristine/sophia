@@ -1,5 +1,7 @@
 #include <loader/efi/shim.h>
 
+#include <kernel/entry.h>
+
 #include <efi.h>
 #include <efidebug.h>
 #include <efilib.h>
@@ -24,9 +26,10 @@ static struct efi_loader_image shim_image =
 
 static struct efi_loader_interface loader_interface =
 {
+    NULL,
+    NULL,
     &alloc_page,
     &free_page,
-
     &open_image,
     &allocate_image,
     &load_image
@@ -35,8 +38,8 @@ static struct efi_loader_interface loader_interface =
 EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 {
     InitializeLib(image_handle, system_table);
-
-    shim_image.image_handle = image_handle;
+    loader_interface.image_handle = image_handle;
+    loader_interface.system_table = system_table;
 
     EFI_STATUS status;
 
@@ -102,10 +105,10 @@ EFI_STATUS open_image(struct efi_loader_image *image)
 
     EFI_STATUS status;
 
-    status = gBS->OpenProtocol(image->image_handle,
+    status = gBS->OpenProtocol(loader_interface.image_handle,
             &LoadedImageProtocol,
             (void  *)&loader_image,
-            image->image_handle,
+            loader_interface.image_handle,
             NULL,
             EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 
@@ -269,10 +272,10 @@ static EFI_STATUS enter_shim(void)
 {
     EFI_STATUS status;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)shim_image.buffer_base;
-    efi_shim_entry_func entry;
+    kc_entry_func entry;
 
-    entry = (efi_shim_entry_func)(shim_image.buffer_base + ehdr->e_entry);
-    status = entry(&shim_image, &loader_interface);
+    entry = (kc_entry_func)(shim_image.buffer_base + ehdr->e_entry);
+    status = entry(&loader_interface);
     return status;
 }
 

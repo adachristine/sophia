@@ -37,37 +37,23 @@ struct efi_loader_image kernel_image =
     .path = L"\\adasoft\\sophia\\kernel.os"
 };
 
-static struct efi_loader_image *shim_image;
 static struct efi_boot_data boot_data;
 
-EFI_STATUS efi_shim_entry(struct efi_loader_image *image,
-        struct efi_loader_interface *interface)
+// TODO: split relocation code out into library
+
+EFI_STATUS kc_main(struct efi_loader_interface *interface)
 {
-    /* 1. load kernel and boot modules into memory
-     * 2. generate page tables for kernel and boot modules
-     * 2. gather boot data, store as type SystemMemoryType
-     * 3. exit boot services
-     * 5. ???????????
-     */
-
-    void *image_base = (void *)image->buffer_base;
-
-    elf_reloc(image_base);
+    // 1. load kernel and boot modules into memory
+    // 2. generate page tables for kernel and boot modules
+    // 2. gather boot data, store as type SystemMemoryType
+    // 3. exit boot services
+    // 5. ???????????
 
     EFI_STATUS status;
 
-    if (!image)
+    if (!interface)
     {
         return EFI_INVALID_PARAMETER;
-    }
-    else if (!shim_image)
-    {
-        shim_image = image;
-        kernel_image.image_handle = shim_image->image_handle;
-    }
-    else
-    {
-        return EFI_ALREADY_STARTED;
     }
 
     if (!EFI_ERROR((status = interface->image_open(&kernel_image))) &&

@@ -14,11 +14,12 @@ CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden \
 	  -g -fshort-wchar -mgeneral-regs-only
 
 LIBDIRS += -L$(dir $(shell $(CC) -print-libgcc-file-name))
-LDSCRIPT := shim.ld
+LDSCRIPT := ../lib/component.ld
 LDFLAGS += -z max-page-size=4096 --export-dynamic -pic --no-dynamic-linker
 LOADLIBES := -lgcc
 
-OBJS := entry.o elf.o memcmp.o memcpy.o memmove.o memset.o
+OBJS := entry_x86_64.o reloc_x86_64.o kc_main.o elf64.o memcmp.o memcpy.o \
+	memmove.o memset.o
 $(OBJS): CFLAGS += -fPIC
 
 DEPS := $(patsubst %.o,%.d,$(OBJS))

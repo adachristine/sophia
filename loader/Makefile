@@ -10,8 +10,7 @@ CPPFLAGS += -I../api
 
 all: $(BUILD)
 
-OBJS := main_efi.o elf.o \
-	memcmp.o memmove.o
+OBJS := main_efi.o elf64.o memcmp.o memmove.o
 DEPS := $(OBJS:.o=.d)
 
 IMAGE_SO := $(IMAGE:.efi=_efi.so)
