@@ -2,8 +2,8 @@
 
 imagefile=uefi.img
 loaderfile=loader/loader.efi
-shimfile=shim/efi.os
-kernelfile=kernel/kernel.os
+shimfile=kc/boot/efi.os
+kernelfile=kc/core/kernel.os
 
 if [[ ! -f ${imagefile} ]]; then
     dd if=/dev/zero of=${imagefile} bs=1024 count=1440

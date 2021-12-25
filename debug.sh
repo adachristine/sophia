@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
+make -C kc/core &&
+make -C kc/boot &&
 make -C loader &&
-make -C shim &&
-make -C kernel &&
 
 ./image.sh &&
 
