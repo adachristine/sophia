@@ -5,7 +5,7 @@
 
 #include <stddef.h>
 
-typdef int (*memory_space_handler_func)(uint32_t code, void *vaddr);
+typedef int (*memory_space_handler_func)(uint32_t code, void *vaddr);
 
 enum page_map_flags
 {
@@ -19,21 +19,6 @@ enum page_map_flags
     SIZE_1G = 0xc,
     SIZE_MASK = 0xc,
 };
-
-enum memory_space_flags
-{
-    SYSTEM_SPACE = 0x1, // memory cannot be swapped
-};
-
-struct memory_space
-{
-    enum memory_space_flags flags;
-    memory_space_handler_func handler;
-    void *base;
-    void *head;
-};
-
-void memory_init(struct memory_range *ranges, int count);
 
 void *memcpy(void *dest, const void *src, size_t size);
 void *memmove(void *dest, const void *src, size_t size);
@@ -51,3 +36,4 @@ void heap_free(void *block);
 
 void *memory_alloc(size_t size);
 void memory_free(void *block);
+

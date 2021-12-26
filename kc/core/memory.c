@@ -47,11 +47,7 @@ struct page
     uint32_t used: 1;
 };
 
-extern char k_virt_base;
-extern char k_text_begin;
-extern char k_text_end;
-extern char k_data_begin;
-extern char k_data_end;
+extern char kc_image_base;
 
 static struct page *const page_array = (struct page *)0xffffffd800000000;
 static int first_free_page_index = -1;
@@ -72,11 +68,6 @@ static void *page_map_at(void *vaddr, phys_addr_t paddr, enum page_map_flags fla
 int anonymous_page_handler(uint32_t code, void *address);
 
 // the system memory_space's that are always present
-static struct memory_space kernel_image_space;
-static struct memory_space kernel_stack_space;
-static struct memory_space kernel_pagemap_space;
-// the kernel's own heap space
-static struct memory_space kernel_heap_space;
 
 // NULL if the system address spaces are not set up
 static struct memory_space *root_memory_space;
@@ -150,7 +141,7 @@ static phys_addr_t get_kernel_pm3_phys(void)
                                 CONTENT_RODATA|SIZE_2M);
     
     // pm3_phys is in pm4.
-    pm3_phys = page_address(pm4[pte_index(&k_virt_base, 4)], 1);
+    pm3_phys = page_address(pm4[pte_index(&kc_image_base, 4)], 1);
     // never leave a temporary mapping
     page_unmap(pm4);
     
@@ -285,32 +276,6 @@ static struct memory_space init_anonymous_space(void *base, void *head)
                                  NULL};
     
     return space;
-}
-
-void memory_init(struct memory_range *ranges, int count)
-{
-    init_create_page_array(ranges, count);
-    // initialize always-present memory spaces for the vmm
-    kernel_image_space = init_system_space((void *)&k_text_begin,
-                                           (void *)align_next(&k_data_end, PAGE_SIZE));
-    kernel_stack_space = init_system_space((void *)KERNEL_ENTRY_STACK_BASE,
-                                           (void *)KERNEL_ENTRY_STACK_HEAD);
-    kernel_pagemap_space = init_system_space(kernel_pm1, (void *)-1LL);
-    
-    // initialize the kernel heap space
-    kernel_heap_space = init_anonymous_space(kernel_image_space.head,
-                                             (char *)kernel_image_space.head +
-                                             KERNEL_HEAP_SPACE_SIZE);
-    
-    // set up the list links
-    kernel_image_space.next = &kernel_heap_space;
-    kernel_heap_space.prev = &kernel_image_space;
-    kernel_heap_space.next = &kernel_stack_space;
-    kernel_stack_space.prev = &kernel_heap_space;
-    kernel_stack_space.next = &kernel_pagemap_space;
-    kernel_pagemap_space.prev = &kernel_stack_space;
-    
-    root_memory_space = &kernel_image_space;
 }
 
 static void *page_map_at(void *vaddr,
@@ -475,7 +440,7 @@ int anonymous_page_handler(uint32_t code, void *address)
     }
     kputs("anonymous fault\n");
     // kernel page mappings are built different
-    if (address >= (void *)&k_virt_base)
+    if (address >= (void *)&kc_image_base)
     {
         uint64_t *pm2e = get_kernel_pm2e(address);
         
