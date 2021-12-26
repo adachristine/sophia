@@ -15,7 +15,7 @@ unsigned long kc_main(void *data)
     (void)data;
     cpu_init();
     serial_init();
-    kputs("<hacker voice> i'm in\r\n");
+    kputs("<hacker voice> i'm in 3333\r\n");
     halt();
 }
 
