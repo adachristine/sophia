@@ -1,4 +1,5 @@
 include ../../defaults.mk
+include ../defaults.mk
 
 VPATH := ../../lib ../
 
@@ -7,11 +8,6 @@ TARGET := kernel.os
 
 CPPFLAGS += -I../../api
 CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
-
-LIBDIRS += -L$(dir $(shell $(CC) -print-libgcc-file-name))
-LDSCRIPT := ../component.ld
-LDFLAGS += -z max-page-size=4096 --export-dynamic -pic --no-dynamic-linker
-LOADLIBES := -lgcc
 
 SOBJS := 
 GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o \
