@@ -15,7 +15,7 @@ LOADLIBES := -lgcc
 
 SOBJS := 
 GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o \
-	 kc_main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
+	 kc_main.o main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
 	 exceptions.o panic.o
 IOBJS :=
 
