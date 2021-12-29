@@ -28,7 +28,8 @@
 #define pte_index_bits(l) (PAGE_OFFSET_BITS + PAGE_MAP_BITS * (l - 1))
 #define pte_index(v, l) (((uintptr_t)v >> pte_index_bits(l)) & PAGE_TABLE_INDEX_MASK)
 #define page_size(l) (1 << pte_index_bits(l))
-#define page_address(a, l) ((uintptr_t)a & ~(page_size(l) - 1))
-#define page_offset(a, l) ((uintptr_t)a & (page_size(l) - 1))
+#define page_address(a, l) ((uintptr_t)(a) & ~(page_size(l) - 1))
+#define page_offset(a, l) ((uintptr_t)(a) & (page_size(l) - 1))
 #define page_count(s, l) (((s + page_size(l) - 1) & ~(page_size(l) - 1)) / page_size(l))
+#define page_align(a, l) ((page_size(l) + (uintptr_t)(a)) & ~(page_size(l) - 1))
 
