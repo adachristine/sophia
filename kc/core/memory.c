@@ -6,7 +6,6 @@
 
 #include <kernel/entry.h>
 #include <kernel/memory/paging.h>
-#include <kernel/component.h>
 
 /* kernel virtual space guarantees
  * 
@@ -29,7 +28,6 @@ typedef int (*page_fault_handler_func)(uint32_t code, void *address);
 
 enum memory_space_flags
 {
-    VOID_MEMORY_SPACE, // memory that cannot do anything
     SYSTEM_MEMORY_SPACE, // memory that cannot fault
     ANONYMOUS_MEMORY_SPACE, // memory that can fault
 };
@@ -74,9 +72,6 @@ int anonymous_page_handler(uint32_t code, void *address);
 
 // NULL if the system address spaces are not set up
 static struct memory_space *root_memory_space;
-static struct memory_space core_code_space; // kernel core code
-static struct memory_space core_static_space; // kernel core static data/bss
-static struct memory_space core_object_space; // kernel core dynamic space
 
 static struct memory_range init_grab_pages(struct memory_range *ranges,
                                            int count,
@@ -331,40 +326,9 @@ static void *page_map_at(void *vaddr,
     return (char *)vaddr + offset;
 }
 
-#define KERNEL_OBJECT_SPACE_EXTENT 0x1000000 // 16MiB for kernel object space?
-
 void memory_init(struct memory_range *ranges, size_t count)
 {
     init_create_page_array(ranges, count);
-
-    core_code_space = init_system_space(&kc_text_begin, &kc_text_end);
-    core_static_space = init_system_space(&kc_data_begin, &kc_data_end);
-    core_object_space = init_anonymous_space(&kc_data_end,
-            (void *)page_align(&kc_data_end + KERNEL_OBJECT_SPACE_EXTENT,
-                2));
-
-    root_memory_space = &core_code_space;
-
-    core_code_space.prev = NULL;
-    core_code_space.next = &core_static_space;
-    core_static_space.prev = &core_code_space;
-    core_static_space.next = &core_object_space;
-    core_object_space.prev = &core_static_space;
-    core_object_space.next = NULL;
-
-
-    __asm__ volatile
-        (
-         "mov %0, %%dr0\r\n"
-         "mov %1, %%dr1\r\n"
-         "mov %2, %%dr3\r\n"
-        :
-        : "r"(core_object_space.base),
-          "r"(core_object_space.head),
-          "r"(core_object_space.handler));
-
-    char *test = (char *)core_object_space.head - page_size(1);
-    *test = 'a';
 }
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags)
@@ -462,10 +426,8 @@ static struct memory_space *get_memory_space(void *address)
     
     while (space)
     {
-        kputs("checking a space\n");
-        if ((space->base <= address) && (address < space->head))
+        if (space->base >= address && address <= space->head)
         {
-            kputs("space matched\n");
             return space;
         }
         space = space->next;
@@ -476,13 +438,13 @@ static struct memory_space *get_memory_space(void *address)
 
 int anonymous_page_handler(uint32_t code, void *address)
 {
-    kputs("anonymous space fault\n");
     if (code & PAGE_PR)
     {
         // there's no reason a protection violation should happen
         // in anonymous space
         panic(UNHANDLED_FAULT);
     }
+    kputs("anonymous fault\n");
     // kernel page mappings are built different
     if (address >= (void *)&kc_image_base)
     {
@@ -531,7 +493,6 @@ int page_fault_handler(uint32_t code, void *address)
     struct memory_space *space = get_memory_space(address);
     if (space && space->handler)
     {
-        kputs("found memory space\n");
         int result = space->handler(code, address);
         
         if (result)
@@ -539,12 +500,6 @@ int page_fault_handler(uint32_t code, void *address)
             panic(UNHANDLED_FAULT);
         }
     }
-    else
-    {
-        kputs("didn't found memory space\n");
-        panic(UNHANDLED_FAULT);
-    }
     
     return 0;
 }
-
