@@ -13,6 +13,7 @@
  * 1. kernel virtual space is 2GiB in size on 2GiB alignment.
  * 2. mappings begin at +0x7fc00000. this mapping space is sparse and its
  *    own mapping tables begin at +0x7fffe000.
+ * 3. There is at least 64KiB of mapped pages following the kc_image_end symbol.
  */
 
 #define kpm1_index(v) (((uint64_t)v >> pte_index_bits(1)) & 0x7ffff)
@@ -323,6 +324,11 @@ static void *page_map_at(void *vaddr,
     
     *pte = entry;
     return (char *)vaddr + offset;
+}
+
+void memory_init(struct memory_range *ranges, size_t count)
+{
+    init_create_page_array(ranges, count);
 }
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags)

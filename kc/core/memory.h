@@ -20,6 +20,8 @@ enum page_map_flags
     SIZE_MASK = 0xc,
 };
 
+void memory_init(struct memory_range *ranges, size_t count);
+
 void *memcpy(void *dest, const void *src, size_t size);
 void *memmove(void *dest, const void *src, size_t size);
 void *memset(void *dest, int val, size_t size);

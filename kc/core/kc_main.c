@@ -10,12 +10,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-unsigned long kc_main(void *data)
+unsigned long kc_main(struct kc_boot_data *data)
 {
     (void)data;
     cpu_init();
     serial_init();
     kputs("<hacker voice> i'm in 3333\r\n");
+    memory_init(data->phys_memory_map.base, data->phys_memory_map.entries);
     halt();
 }
 
