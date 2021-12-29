@@ -44,9 +44,10 @@ static struct efi_boot_data boot_data;
 static EFI_BOOT_SERVICES *e_bs = NULL;
 static uint64_t *system_page_map = NULL;
 static SIMPLE_TEXT_OUTPUT_INTERFACE *eto;
-static char *kernel_space_end;
+static struct kc_boot_data *k_boot_data;
+
+static void *object_space_base;
 static size_t object_space_size;
-struct kc_boot_data *k_boot_data;
 
 enum page_type
 {
@@ -265,20 +266,28 @@ static void collect_boot_data(void)
     }
 }
 
+static void *kobject_alloc(size_t size)
+{
+    if (!k_boot_data)
+        return NULL;
+    if (size > k_boot_data->object_space.size)
+        return NULL;
+
+    void *block = k_boot_data->object_space.base;
+    k_boot_data->object_space.base = (void *)(size + 
+            (char *)k_boot_data->object_space.base);
+    k_boot_data->object_space.size -= size;
+
+    return block;
+}
+
 static void convert_memory_map(void)
 {
-    k_boot_data = (struct kc_boot_data *)kernel_space_end;
-    kernel_space_end += sizeof(*k_boot_data);
-
-    object_space_size -= sizeof(*k_boot_data);
-
-    k_boot_data->phys_memory_map.base = (struct memory_range *)kernel_space_end;
     k_boot_data->phys_memory_map.entries = boot_data.memory_map.size /
         boot_data.memory_map.descsize;
-
-    object_space_size -= (k_boot_data->phys_memory_map.entries *
+    k_boot_data->phys_memory_map.base = (struct memory_range *)kobject_alloc(
+            k_boot_data->phys_memory_map.entries * 
             sizeof(*k_boot_data->phys_memory_map.base));
-
 
     struct memory_range *ranges = k_boot_data->phys_memory_map.base;
 
@@ -334,6 +343,10 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
 
     set_page_map(system_page_map);
 
+    k_boot_data = (struct kc_boot_data *)object_space_base;
+    k_boot_data->object_space.base = sizeof(*k_boot_data) + (char *)object_space_base;
+    k_boot_data->object_space.size = object_space_size;
+
     convert_memory_map();
 
     kc_entry_func kernel_entry = (kc_entry_func)
@@ -378,8 +391,8 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
 
         plog(L"mapping kernel pages\r\n");
         create_kernel_maps(ehdr, (void *)KERNEL_SPACE_LOWER);
-        kernel_space_end = kernel_image.buffer_size +
-            (char *)KERNEL_SPACE_LOWER;
+        object_space_base = (void *)(kernel_image.buffer_size +
+            (char *)KERNEL_SPACE_LOWER);
 
         // map pages up to the nearest 2MB
         // unless there aren't at least 16 4KiB pages remaining
@@ -388,13 +401,13 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
         // it is not necessary to know the actual size of this object
         // as it will be overlaid with a virtual address space
         // upon kernel initialization.
-        uint64_t object_space_end = ((uintptr_t)kernel_space_end + 
+        uint64_t object_space_end = ((uintptr_t)object_space_base + 
                 page_size(2) + page_size(1) * 16) &
             ~(page_size(2) - 1);
 
-        uint64_t object_space_size = object_space_end -
-            (uintptr_t)kernel_space_end;
-        uint64_t object_space_phys_base;
+        object_space_size = object_space_end -
+            (uintptr_t)object_space_base;
+        EFI_PHYSICAL_ADDRESS object_space_phys_base;
 
         status = loader_interface->page_alloc(SystemMemoryType,
                 object_space_size,
@@ -407,7 +420,7 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
         }
 
         map_pages(system_page_map,
-                (uintptr_t)kernel_space_end,
+                (uintptr_t)object_space_base,
                 object_space_phys_base,
                 DATA_PAGE_TYPE,
                 object_space_size);
