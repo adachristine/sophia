@@ -22,16 +22,24 @@
 
 #define align_next(v, a) (((uint64_t)v + a - 1) & ~(a - 1))
 
-// a conservative 128MB for kernel heap
-#define KERNEL_HEAP_SPACE_SIZE (128 << 20)
-
 typedef int (*page_fault_handler_func)(uint32_t code, void *address);
 
 enum memory_space_flags
 {
-    VOID_MEMORY_SPACE, // memory that cannot do anything
-    SYSTEM_MEMORY_SPACE, // memory that cannot fault
-    ANONYMOUS_MEMORY_SPACE, // memory that can fault
+    VOID_MEMORY_SPACE = 0x00, // memory that cannot do anything, i.e. a guard page
+    TRANSLATION_MEMORY_SPACE = 0x01, // a mapping to a fixed location in memory
+    ANONYMOUS_MEMORY_SPACE = 0x02, // a mapping to an arbitrary location in memory
+    OBJECT_MEMORY_SPACE = 0x03, // a mapping managed by an underlying object
+
+    MEMORY_SPACE_TYPE_MASK = 0x0f, //
+    
+    NOFAULT_MEMORY_FLAG = 0x10, // a mapping that cannot be resolved during a page fault
+    NOSWAP_MEMORY_FLAG = 0x20, // a mapping that cannot be swapped out
+    COW_MEMORY_FLAG = 0x40, // a mapping that is copy-on-write
+
+    MEMORY_SPACE_FLAGS_MASK = 0xf0,
+
+    INVALID_MEMORY_SPACE = 0xff
 };
 
 struct memory_space
@@ -268,19 +276,27 @@ static void init_create_page_array(struct memory_range *ranges, int count)
 
 static struct memory_space init_system_space(void *base, void *head)
 {
-    struct memory_space space = {SYSTEM_MEMORY_SPACE, NULL, base, head, NULL, NULL};
+    struct memory_space space = {TRANSLATION_MEMORY_SPACE|
+            NOFAULT_MEMORY_FLAG|
+            NOSWAP_MEMORY_FLAG,
+        NULL,
+        base,
+        head,
+        NULL,
+        NULL};
     return space;
 }
 
 static struct memory_space init_anonymous_space(void *base, void *head)
 {
-    struct memory_space space = {ANONYMOUS_MEMORY_SPACE,
-                                 &anonymous_page_handler,
-                                 base,
-                                 head,
-                                 NULL,
-                                 NULL};
-    
+    struct memory_space space = {ANONYMOUS_MEMORY_SPACE|
+            NOSWAP_MEMORY_FLAG,
+        &anonymous_page_handler,
+        base,
+        head,
+        NULL,
+        NULL};
+
     return space;
 }
 
