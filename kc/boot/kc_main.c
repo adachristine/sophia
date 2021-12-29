@@ -44,14 +44,34 @@ static struct efi_boot_data boot_data;
 static EFI_BOOT_SERVICES *e_bs = NULL;
 static uint64_t *system_page_map = NULL;
 static SIMPLE_TEXT_OUTPUT_INTERFACE *eto;
+static char *kernel_space_end;
+static size_t object_space_size;
+struct kc_boot_data *k_boot_data;
 
 enum page_type
 {
     INVALID_PAGE_TYPE = 0x0,
     CODE_PAGE_TYPE = PAGE_PR,
-    RODATA_PAGE_TYPE = PAGE_PR|PAGE_NX,
-    DATA_PAGE_TYPE = PAGE_PR|PAGE_WR|PAGE_NX
+    RODATA_PAGE_TYPE = PAGE_PR,
+    DATA_PAGE_TYPE = PAGE_PR|PAGE_WR
 };
+
+static inline void debug()
+{
+    __asm__ volatile
+        (
+         "push %rax\r\n"
+         "mov -8(%rsp), %rax\n\t"
+         "mov %rax, %dr0\n\t"
+         "pop %rax\r\n"
+         "pushf\n\t"
+         "cli\n\t"
+         "int3\n\t"
+         "1:\n\t"
+         "hlt\n\t"
+         "jmp 1b\n\t"
+        );
+}
 
 static inline void plog(CHAR16 *message)
 {
@@ -85,8 +105,14 @@ static uint64_t *get_page_map(void)
 
 void set_page_map(uint64_t *map)
 {
-    __asm__("cli");
-    __asm__("mov %0, %%cr3" :: "r"(map));
+    __asm__ volatile
+        (
+         "pushf\n\t"
+         "cli\n\t"
+         "mov %0, %%cr3\n\t"
+         "popf\n\t"
+         :
+         : "r"(map));
 }
 
 static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
@@ -190,7 +216,6 @@ static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
         (uint64_t)upper_page_dir|DATA_PAGE_TYPE;
     upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
         (uint64_t)lower_page_dir|DATA_PAGE_TYPE;
-
 }
 
 static void collect_boot_data(void)
@@ -236,19 +261,40 @@ static void collect_boot_data(void)
     if (EFI_ERROR(status))
     {
         plog(L"failed getting memory map\r\n");
-        __asm__ volatile
-        (
-            "cli\n\t"
-            "int3\n\t"
-        );
+        debug();
+    }
+}
 
-        while (1)
-        {
-            __asm__ volatile ("hlt\n\t");
-        }
+static void convert_memory_map(void)
+{
+    (void)object_space_size;
+}
+
+static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
+{
+    EFI_STATUS status;
+
+    plog(L"exiting boot services\r\n");
+    collect_boot_data();
+
+    status = e_bs->ExitBootServices(loader_interface->image_handle,
+            boot_data.memory_map.key);
+
+    if (EFI_ERROR(status))
+    {
+        plog(L"failed exiting boot services\r\n");
+        debug();
     }
 
-    plog(L"boot data collected successfully\r\n");
+    set_page_map(system_page_map);
+
+    convert_memory_map();
+
+    kc_entry_func kernel_entry = (kc_entry_func)
+        (KERNEL_SPACE_LOWER + ehdr->e_entry);
+    kernel_entry(k_boot_data);
+
+    return status;
 }
 
 EFI_STATUS kc_main(struct efi_loader_interface *interface)
@@ -275,7 +321,6 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
             !EFI_ERROR((status = interface->image_load(&kernel_image))))
     {
         plog(L"collecting boot data\r\n");
-        collect_boot_data();
 
         plog(L"creating page tables\r\n");
         system_page_map = new_page_table();
@@ -287,17 +332,41 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
 
         plog(L"mapping kernel pages\r\n");
         create_kernel_maps(ehdr, (void *)KERNEL_SPACE_LOWER);
+        kernel_space_end = kernel_image.buffer_size +
+            (char *)KERNEL_SPACE_LOWER;
 
+        // map pages up to the nearest 2MB
+        // unless there aren't at least 16 4KiB pages remaining
+        // until the boundary. this will ensure there is at least
+        // 64KiB and at most 2MiB.
+        // it is not necessary to know the actual size of this object
+        // as it will be overlaid with a virtual address space
+        // upon kernel initialization.
+        uint64_t object_space_end = ((uintptr_t)kernel_space_end + 
+                page_size(2) + page_size(1) * 16) &
+            ~(page_size(2) - 1);
 
-        plog(L"exiting boot services\r\n");
-        e_bs->ExitBootServices(loader_interface->image_handle,
-                boot_data.memory_map.key);
+        uint64_t object_space_size = object_space_end -
+            (uintptr_t)kernel_space_end;
+        uint64_t object_space_phys_base;
 
-        set_page_map(system_page_map);
+        status = loader_interface->page_alloc(SystemMemoryType,
+                object_space_size,
+                &object_space_phys_base);
 
-        kc_entry_func kernel_entry = (kc_entry_func)
-            (KERNEL_SPACE_LOWER + ehdr->e_entry);
-        kernel_entry(NULL);
+        if (EFI_ERROR(status))
+        {
+            plog(L"failed allocating object space");
+            debug();
+        }
+
+        map_pages(system_page_map,
+                (uintptr_t)kernel_space_end,
+                object_space_phys_base,
+                DATA_PAGE_TYPE,
+                object_space_size);
+
+        enter_kernel(ehdr);
     }
 
     __asm__ volatile (
