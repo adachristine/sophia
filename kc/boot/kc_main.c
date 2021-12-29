@@ -412,6 +412,8 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
                 DATA_PAGE_TYPE,
                 object_space_size);
 
+        e_bs->SetMem((void *)object_space_phys_base, object_space_size, 0);
+
         enter_kernel(ehdr);
     }
 
