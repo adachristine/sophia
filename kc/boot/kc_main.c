@@ -267,7 +267,53 @@ static void collect_boot_data(void)
 
 static void convert_memory_map(void)
 {
-    (void)object_space_size;
+    k_boot_data = (struct kc_boot_data *)kernel_space_end;
+    kernel_space_end += sizeof(*k_boot_data);
+
+    object_space_size -= sizeof(*k_boot_data);
+
+    k_boot_data->phys_memory_map.base = (struct memory_range *)kernel_space_end;
+    k_boot_data->phys_memory_map.entries = boot_data.memory_map.size /
+        boot_data.memory_map.descsize;
+
+    object_space_size -= (k_boot_data->phys_memory_map.entries *
+            sizeof(*k_boot_data->phys_memory_map.base));
+
+
+    struct memory_range *ranges = k_boot_data->phys_memory_map.base;
+
+    for (size_t i = 0; i < k_boot_data->phys_memory_map.entries; i++)
+    {
+        EFI_MEMORY_DESCRIPTOR *desc;
+        desc = (EFI_MEMORY_DESCRIPTOR *)(boot_data.memory_map.buffer.base + 
+                i * 
+                boot_data.memory_map.descsize);
+
+        enum memory_range_type type;
+        phys_addr_t base;
+        size_t size;
+        
+        base = desc->PhysicalStart;
+        size = desc->NumberOfPages * EFI_PAGE_SIZE;
+        
+        switch (desc->Type)
+        {
+            case EfiConventionalMemory:
+            case EfiBootServicesData:
+            case EfiBootServicesCode:
+                type = AVAILABLE_MEMORY;
+                break;
+            case SystemMemoryType:
+                type = SYSTEM_MEMORY;
+                break;
+            default:
+                type = RESERVED_MEMORY;
+        }
+        
+        ranges[i].type = type;
+        ranges[i].base = base;
+        ranges[i].size = size;
+    }
 }
 
 static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
