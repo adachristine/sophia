@@ -4,8 +4,6 @@
 
 #include <stdint.h>
 
-#include <kernel/entry.h>
-#include <kernel/memory/paging.h>
 #include <kernel/component.h>
 
 /* kernel virtual space guarantees
@@ -92,7 +90,7 @@ static struct memory_range init_grab_pages(struct memory_range *ranges,
 {
     struct memory_range request = {SYSTEM_MEMORY,
                                    0,
-                                   align_next(size, PAGE_SIZE)};
+                                   align_next(size, page_size(1))};
     
     for (int i = 0; i < count; i++)
     {
@@ -349,15 +347,15 @@ static void *page_map_at(void *vaddr,
 
 #define KERNEL_OBJECT_SPACE_EXTENT 0x1000000 // 16MiB for kernel object space?
 
-void memory_init(struct memory_range *ranges, size_t count)
+void memory_init(struct kc_boot_data *boot_data)
 {
-    init_create_page_array(ranges, count);
+    init_create_page_array(boot_data->phys_memory_map.base,
+            boot_data->phys_memory_map.entries);
 
     core_code_space = init_system_space(&kc_text_begin, &kc_text_end);
     core_static_space = init_system_space(&kc_data_begin, &kc_data_end);
-    core_object_space = init_anonymous_space(&kc_data_end,
-            (void *)page_align(&kc_data_end + KERNEL_OBJECT_SPACE_EXTENT,
-                2));
+    core_object_space = init_anonymous_space(boot_data->object_space.base,
+            (void *)page_align(&kc_data_end + KERNEL_OBJECT_SPACE_EXTENT, 2));
 
     root_memory_space = &core_code_space;
 
@@ -367,6 +365,11 @@ void memory_init(struct memory_range *ranges, size_t count)
     core_static_space.next = &core_object_space;
     core_object_space.prev = &core_static_space;
     core_object_space.next = NULL;
+
+    // XXX: testing testing 123
+
+    char *test = (char *)core_object_space.head - page_size(1);
+    *test = 'a';
 }
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags)

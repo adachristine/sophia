@@ -1,5 +1,6 @@
 #pragma once
 
+#include <kernel/entry.h>
 #include <kernel/memory/paging.h>
 #include <kernel/memory/range.h>
 
@@ -20,7 +21,7 @@ enum page_map_flags
     SIZE_MASK = 0xc,
 };
 
-void memory_init(struct memory_range *ranges, size_t count);
+void memory_init(struct kc_boot_data *boot_data);
 
 void *memcpy(void *dest, const void *src, size_t size);
 void *memmove(void *dest, const void *src, size_t size);

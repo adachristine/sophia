@@ -16,7 +16,7 @@ unsigned long kc_main(struct kc_boot_data *data)
     cpu_init();
     serial_init();
     kputs("<hacker voice> i'm in 3333\r\n");
-    memory_init(data->phys_memory_map.base, data->phys_memory_map.entries);
+    memory_init(data);
     halt();
 }
 
