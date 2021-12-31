@@ -208,7 +208,11 @@ static EFI_STATUS read_image(struct efi_loader_image *image,
         UINTN offset,
         UINTN length)
 {
-    Print(L"reading %d bytes from image at 0x%8.0x %s\r\n", length, offset, image->path);
+    Print(L"reading %d bytes from image at 0x%8.0x %s\r\n",
+        length,
+        offset,
+        image->path);
+
     EFI_STATUS status;
 
     ASSERT(buffer);
