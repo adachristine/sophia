@@ -365,11 +365,6 @@ void memory_init(struct kc_boot_data *boot_data)
     core_static_space.next = &core_object_space;
     core_object_space.prev = &core_static_space;
     core_object_space.next = NULL;
-
-    // XXX: testing testing 123
-
-    char *test = (char *)core_object_space.head - page_size(1);
-    *test = 'a';
 }
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags)
