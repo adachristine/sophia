@@ -344,8 +344,7 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
     set_page_map(system_page_map);
 
     k_boot_data = (struct kc_boot_data *)object_space_base;
-    k_boot_data->object_space.base = sizeof(*k_boot_data) +
-        (char *)object_space_base;
+    k_boot_data->object_space.base = sizeof(*k_boot_data) + (char *)object_space_base;
     k_boot_data->object_space.size = object_space_size;
 
     convert_memory_map();
@@ -402,8 +401,9 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
         // it is not necessary to know the actual size of this object
         // as it will be overlaid with a virtual address space
         // upon kernel initialization.
-        uint64_t object_space_end = (uintptr_t)object_space_base +
-                page_size(1) * 16;
+        uint64_t object_space_end = ((uintptr_t)object_space_base + 
+                page_size(2) + page_size(1) * 16) &
+            ~(page_size(2) - 1);
 
         object_space_size = object_space_end -
             (uintptr_t)object_space_base;
