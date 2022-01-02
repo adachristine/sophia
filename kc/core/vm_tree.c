@@ -296,10 +296,10 @@ struct vm_tree_node *vmn_successor_node(
         return vmn_min(N->right);
     }
 
-    struct vm_tree_node *p = n->parent;
-    while (p && n == p->right)
+    struct vm_tree_node *p = N->parent;
+    while (p && N == p->right)
     {
-        n = p;
+        N = p;
         p = p->parent;
     }
 

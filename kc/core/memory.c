@@ -63,11 +63,12 @@ static uint64_t *get_kernel_pm1e(void *vaddr);
 static uint64_t *get_kernel_pm2e(void *vaddr);
 static void *page_map_at(void *vaddr, phys_addr_t paddr, enum page_map_flags flags);
 
-struct vm_tree core_vm_tree;
-struct vm_tree_node core_pagestack_node;
-struct vm_tree_node core_image_node;
-struct vm_tree_node core_object_node;
-struct vm_tree_node core_pagemaps_node;
+static struct vm_tree core_vm_tree;
+static struct vm_tree_node core_image_node;
+static struct vm_tree_node core_vmobject_node;
+static struct vm_tree_node core_pagemaps_node;
+static size_t vm_object_space_size = 0x1000000; // 16MiB to start.
+static void *vm_next_free = NULL;
 
 static struct memory_range init_grab_pages(struct memory_range *ranges,
         int count,
@@ -306,8 +307,6 @@ static void *page_map_at(void *vaddr,
     return (char *)vaddr + offset;
 }
 
-#define KERNEL_OBJECT_SPACE_EXTENT 0x1000000 // 16MiB for kernel object space?
-
 static void init_vm_node(struct vm_tree_node *node, void *base, void *head)
 {
     node->key =
@@ -331,7 +330,8 @@ static void init_vm_node(struct vm_tree_node *node, void *base, void *head)
     }
     else
     {
-        kputs("fatal: overlap on static vm node\n");
+        kputs("fatal: overlap vm node\n");
+        panic(GENERAL_PANIC);
     }
 }
 
@@ -349,14 +349,15 @@ void memory_init(struct kc_boot_data *boot_data)
     init_vm_node(
             &core_image_node,
             &kc_image_base,
-            (void *)page_align(&kc_data_end, 1));
+            object_space_head);
     kputs("vm node 2\n");
     init_vm_node(
-            &core_object_node,
-            (void *)page_align(&kc_data_end, 1),
-            object_space_head);
+            &core_vmobject_node,
+            object_space_head,
+            (char *)object_space_head + vm_object_space_size); 
     kputs("vm node 3\n");
     init_vm_node(&core_pagemaps_node, vm_temp, (void *)-1);
+    vm_next_free = (char *)object_space_head + vm_object_space_size;
 }
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags)
@@ -431,6 +432,19 @@ void *memory_alloc(size_t size)
 void memory_free(void *block)
 {
     (void)block;
+}
+
+struct vm_tree_node *vm_alloc_at(void *address, size_t size)
+{
+    (void)address;
+    (void)size;
+    return NULL;
+}
+
+struct vm_tree_node *vm_alloc(size_t size)
+{
+    (void)size;
+    return NULL;
 }
 
 static uint64_t *get_kernel_pm1e(void *vaddr)

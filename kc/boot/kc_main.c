@@ -337,7 +337,7 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
 
     if (EFI_ERROR(status))
     {
-        plog(L"failed exiting boot services\r\n");
+        plog(L"failed exiting boot services:\r\n");
         debug();
     }
 
@@ -392,16 +392,11 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
 
         plog(L"mapping kernel pages\r\n");
         create_kernel_maps(ehdr, (void *)KERNEL_SPACE_LOWER);
-        object_space_base = (void *)(kernel_image.buffer_size +
-            (char *)KERNEL_SPACE_LOWER);
+        object_space_base =
+            (void *)(page_align(kernel_image.buffer_size,1) +
+                    (char *)KERNEL_SPACE_LOWER);
 
-        // map pages up to the nearest 2MB
-        // unless there aren't at least 16 4KiB pages remaining
-        // until the boundary. this will ensure there is at least
-        // 64KiB and at most 2MiB.
-        // it is not necessary to know the actual size of this object
-        // as it will be overlaid with a virtual address space
-        // upon kernel initialization.
+        // add a tail of 64KiB to the kernel image
         uint64_t object_space_end = (uintptr_t)object_space_base +
                 page_size(1) * 16;
 
