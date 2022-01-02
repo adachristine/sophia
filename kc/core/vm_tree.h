@@ -49,6 +49,8 @@ struct vm_tree_key
     size_t size;
 };
 
+struct vm_object;
+
 struct vm_tree_node
 {
     // red-black binary tree data
@@ -57,7 +59,7 @@ struct vm_tree_node
     enum vm_tree_color color;
     struct vm_tree_key key;
     // object that owns this node
-    void *object;
+    struct vm_object *object;
 };
 
 struct vm_tree
@@ -89,5 +91,5 @@ struct vm_tree_node *vmn_successor_key(
 struct vm_tree_node *vmn_min(struct vm_tree_node *node);
 struct vm_tree_node *vmn_max(struct vm_tree_node *node);
 
-void *vmt_get_object(struct vm_tree *, void *address);
+struct vm_object *vmt_get_object(struct vm_tree *, void *address);
 

@@ -23,6 +23,9 @@
 
 typedef int (*page_fault_handler_func)(uint32_t code, void *address);
 
+static int core_image_handler(uint32_t code, void *address);
+static int core_vmobject_handler(uint32_t code, void *address);
+
 enum memory_space_flags
 {
     VOID_MEMORY_SPACE = 0x00, // memory that cannot do anything, i.e. a guard page
@@ -47,6 +50,19 @@ struct page
     uint32_t used: 1;
 };
 
+enum vm_object_type
+{
+    NULL_VM_OBJECT,
+    TRANSLATION_VM_OBJECT,
+    ANONYMOUS_VM_OBJECT
+};
+
+struct vm_object
+{
+    enum vm_object_type type;
+    page_fault_handler_func handler;
+};
+
 extern char kc_image_base;
 
 static struct page *const page_array = (struct page *)0xffffffd800000000;
@@ -64,9 +80,14 @@ static uint64_t *get_kernel_pm2e(void *vaddr);
 static void *page_map_at(void *vaddr, phys_addr_t paddr, enum page_map_flags flags);
 
 static struct vm_tree core_vm_tree;
+
 static struct vm_tree_node core_image_node;
 static struct vm_tree_node core_vmobject_node;
 static struct vm_tree_node core_pagemaps_node;
+
+static struct vm_object core_image_object = {.type = TRANSLATION_VM_OBJECT};
+static struct vm_object core_vmobject = {.type = ANONYMOUS_VM_OBJECT};
+
 static size_t vm_object_space_size = 0x1000000; // 16MiB to start.
 static void *vm_next_free = NULL;
 
@@ -307,7 +328,10 @@ static void *page_map_at(void *vaddr,
     return (char *)vaddr + offset;
 }
 
-static void init_vm_node(struct vm_tree_node *node, void *base, void *head)
+static void init_vm_node(
+        struct vm_tree_node *node,
+        void *base,
+        void *head)
 {
     node->key =
         (struct vm_tree_key)
@@ -350,11 +374,15 @@ void memory_init(struct kc_boot_data *boot_data)
             &core_image_node,
             &kc_image_base,
             object_space_head);
+    core_image_node.object = &core_image_object;
+    core_image_node.object->handler = core_image_handler;
     kputs("vm node 2\n");
     init_vm_node(
             &core_vmobject_node,
             object_space_head,
-            (char *)object_space_head + vm_object_space_size); 
+            (char *)object_space_head + vm_object_space_size);
+    core_vmobject_node.object = &core_vmobject;
+    core_vmobject_node.object->handler = core_vmobject_handler;
     kputs("vm node 3\n");
     init_vm_node(&core_pagemaps_node, vm_temp, (void *)-1);
     vm_next_free = (char *)object_space_head + vm_object_space_size;
@@ -514,11 +542,10 @@ int page_fault_handler(uint32_t code, void *address)
 {
     (void)code;
     kputs("page fault\n");
-    struct vm_tree_key key = {(uintptr_t)address, 1};
-    struct vm_tree_node *node = vmt_search_key(&core_vm_tree, &key);
-    if (node)
+    struct vm_object *o = vmt_get_object(&core_vm_tree, address);
+    if (o)
     {
-        kputs("found memory object\n");
+        kputs("found memory manager object\n");
         int result = 1;
         if (result)
         {
@@ -531,5 +558,19 @@ int page_fault_handler(uint32_t code, void *address)
         panic(UNHANDLED_FAULT);
     }
     return 0;
+}
+
+static int core_image_handler(uint32_t code, void *address)
+{
+    (void) code;
+    (void) address;
+    return 1;
+}
+
+static int core_vmobject_handler(uint32_t code, void *address)
+{
+    (void)code;
+    (void)address;
+    return 1;
 }
 

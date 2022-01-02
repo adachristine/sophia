@@ -326,7 +326,7 @@ struct vm_tree_node *vmn_max(struct vm_tree_node *node)
     return node;
 }
 
-void *vmt_get_object(struct vm_tree *tree, void *address)
+struct vm_object *vmt_get_object(struct vm_tree *tree, void *address)
 {
     // find the object for a page.
     struct vm_tree_key key = {(uintptr_t)address, 1};
