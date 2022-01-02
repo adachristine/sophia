@@ -12,7 +12,7 @@ CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
 SOBJS := 
 GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o \
 	 kc_main.o main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
-	 exceptions.o panic.o
+	 vm_tree.o exceptions.o panic.o
 IOBJS :=
 
 # __attribute__((interrupt)) requires -mgeneral-regs-only
