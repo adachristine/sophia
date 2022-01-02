@@ -288,14 +288,22 @@ struct vm_tree_node *vmn_predecessor_key(
 }
 
 // search for the successor node for a given key
-struct vm_tree_node *vmn_successor_key(
-        struct vm_tree_node *N,
-        struct vm_tree_key *key)
+struct vm_tree_node *vmn_successor_node(
+        struct vm_tree_node *N)
 {
-    (void)N;
-    (void)key;
-    //TODO: write
-    return NULL;
+    if (N && N->right)
+    {
+        return vmn_min(N->right);
+    }
+
+    struct vm_tree_node *p = n->parent;
+    while (p && n == p->right)
+    {
+        n = p;
+        p = p->parent;
+    }
+
+    return p;
 }
 
 struct vm_tree_node *vmn_min(struct vm_tree_node *node)
