@@ -52,9 +52,9 @@ struct page
 
 enum vm_object_type
 {
-    NULL_VM_OBJECT,
-    TRANSLATION_VM_OBJECT,
-    ANONYMOUS_VM_OBJECT
+    NULL_VM_OBJECT, // a non-object. shouldn't even exist. an abomination unto man and god
+    TRANSLATION_VM_OBJECT, // a direct mapping between a physical and virtual address range
+    ANONYMOUS_VM_OBJECT, // a mapping that has no definite physical location
 };
 
 struct vm_object
@@ -91,7 +91,8 @@ static struct vm_object core_vmobject = {.type = ANONYMOUS_VM_OBJECT};
 static size_t vm_object_space_size = 0x1000000; // 16MiB to start.
 static void *vm_next_free = NULL;
 
-static struct memory_range init_grab_pages(struct memory_range *ranges,
+static struct memory_range init_grab_pages(
+        struct memory_range *ranges,
         int count,
         size_t size)
 {
@@ -453,23 +454,36 @@ void heap_free(void *block)
 
 void *memory_alloc(size_t size)
 {
-    (void)size;
-    return NULL;
+    // allocations larger than page-size should just get an anonymous vm_object
+    if (size < 4096)
+    {
+        return heap_alloc(size);
+    }
+    else
+    {
+        return vm_alloc(size);
+    }
 }
 
 void memory_free(void *block)
 {
+    // a little complicated to implement
+    //
+    // 1. find the vm_object that owns the block
+    //   a. if the vm_object is a heap, call heap_free()
+    //   b. if the vm_object is an anonymous vm_area, call vm_free().
+    //   c. if the object is any other kind issue a bug warning and do nothing
     (void)block;
 }
 
-struct vm_tree_node *vm_alloc_at(void *address, size_t size)
+void *vm_alloc_at(void *address, size_t size)
 {
     (void)address;
     (void)size;
     return NULL;
 }
 
-struct vm_tree_node *vm_alloc(size_t size)
+void *vm_alloc(size_t size)
 {
     (void)size;
     return NULL;
@@ -485,68 +499,71 @@ static uint64_t *get_kernel_pm2e(void *vaddr)
     return &kernel_pm2[kpm2_index(vaddr)];
 }
 
-/*
-   int anonymous_page_handler(uint32_t code, void *address)
-   {
-   kputs("anonymous space fault\n");
-   if (code & PAGE_PR)
-   {
-// there's no reason a protection violation should happen
-// in anonymous space
-panic(UNHANDLED_FAULT);
-}
-// kernel page mappings are built different
-if (address >= (void *)&kc_image_base)
+
+int anonymous_page_handler(uint32_t code, void *address)
 {
-uint64_t *pm2e = get_kernel_pm2e(address);
+    kputs("anonymous space fault\n");
+    if (code & PAGE_PR)
+    {
+        // there's no reason a protection violation should happen
+        // in anonymous space
+        panic(UNHANDLED_FAULT);
+    }
+    // kernel page mappings are built different
+    if (address >= (void *)&kc_image_base)
+    {
+        uint64_t *pm2e = get_kernel_pm2e(address);
 
-if (!page_address(*pm2e, 1))
-{
-// create a page table and install it
-phys_addr_t pm1_phys = page_alloc();
-if (pm1_phys)
-{
-uint64_t *pm1;
-pm1 = page_map_at(temp, pm1_phys, CONTENT_RWDATA|SIZE_2M);
-// zero the page
-memset(pm1, 0, PAGE_SIZE);
-// put the table where it goes
- *pm2e = page_address(pm1_phys, 1)|PAGE_WR|PAGE_PR;
- page_unmap(pm1);
- }
- else
- {
- panic(OUT_OF_MEMORY);
- }
- }
+        if (!page_address(*pm2e, 1))
+        {
+            // create a page table and install it
+            phys_addr_t pm1_phys = page_alloc();
+            if (pm1_phys)
+            {
+                uint64_t *pm1;
+                pm1 = page_map_at(vm_temp, pm1_phys, CONTENT_RWDATA|SIZE_2M);
+                // zero the page
+                memset(pm1, 0, PAGE_SIZE);
+                // put the table where it goes
+                *pm2e = page_address(pm1_phys, 1)|PAGE_WR|PAGE_PR;
+                page_unmap(pm1);
+            }
+            else
+            {
+                panic(OUT_OF_MEMORY);
+            }
+        }
 
- uint64_t *pm1e = get_kernel_pm1e(address);
+        uint64_t *pm1e = get_kernel_pm1e(address);
 
- if (pm1e)
- {
- phys_addr_t page_phys = page_alloc();
- if (page_phys)
- {
- *pm1e = page_address(page_phys, 1)|PAGE_WR|PAGE_PR;
-// clear a potentially dirty page.
-memset((void *)page_address(address, 1), 0, page_size(1));
-}
-}
-}
+        if (pm1e)
+        {
+            phys_addr_t page_phys = page_alloc();
+            if (page_phys)
+            {
+                *pm1e = page_address(page_phys, 1)|PAGE_WR|PAGE_PR;
+                // clear a potentially dirty page.
+                memset((void *)page_address(address, 1), 0, page_size(1));
+            }
+        }
+    }
 
-return 0;
+    return 0;
 }
-*/
 
 int page_fault_handler(uint32_t code, void *address)
 {
     (void)code;
     kputs("page fault\n");
     struct vm_object *o = vmt_get_object(&core_vm_tree, address);
+    int result = 1;
     if (o)
     {
         kputs("found memory manager object\n");
-        int result = 1;
+        if (o->handler)
+        {
+            result = o->handler(code, address);
+        }
         if (result)
         {
             panic(UNHANDLED_FAULT);
@@ -557,6 +574,7 @@ int page_fault_handler(uint32_t code, void *address)
         kputs("didn't find memory object\n");
         panic(UNHANDLED_FAULT);
     }
+
     return 0;
 }
 
@@ -569,8 +587,6 @@ static int core_image_handler(uint32_t code, void *address)
 
 static int core_vmobject_handler(uint32_t code, void *address)
 {
-    (void)code;
-    (void)address;
-    return 1;
+    return anonymous_page_handler(code, address);
 }
 

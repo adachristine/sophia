@@ -37,6 +37,9 @@ void page_free(phys_addr_t paddr);
 void *heap_alloc(size_t size);
 void heap_free(void *block);
 
+void *vm_alloc(size_t size);
+void vm_free(void *block);
+
 void *memory_alloc(size_t size);
 void memory_free(void *block);
 
