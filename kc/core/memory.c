@@ -331,9 +331,11 @@ static void *page_map_at(void *vaddr,
 
 static void init_vm_node(
         struct vm_tree_node *node,
+        struct vm_object *object,
         void *base,
         void *head)
 {
+    memset(node, 0, sizeof(*node));
     node->key =
         (struct vm_tree_key)
         {
@@ -352,10 +354,11 @@ static void init_vm_node(
                 node,
                 p,
                 vmn_child_direction(node, p));
+        node->object = object;
     }
     else
     {
-        kputs("fatal: overlap vm node\n");
+        kputs("fatal: attempt to insert overlapping vm node\n");
         panic(GENERAL_PANIC);
     }
 }
@@ -373,19 +376,19 @@ void memory_init(struct kc_boot_data *boot_data)
     kputs("vm node 1\n");
     init_vm_node(
             &core_image_node,
+            &core_image_object,
             &kc_image_base,
             object_space_head);
-    core_image_node.object = &core_image_object;
     core_image_node.object->handler = core_image_handler;
     kputs("vm node 2\n");
     init_vm_node(
             &core_vmobject_node,
+            &core_vmobject,
             object_space_head,
             (char *)object_space_head + vm_object_space_size);
-    core_vmobject_node.object = &core_vmobject;
     core_vmobject_node.object->handler = core_vmobject_handler;
     kputs("vm node 3\n");
-    init_vm_node(&core_pagemaps_node, vm_temp, (void *)-1);
+    init_vm_node(&core_pagemaps_node, NULL, vm_temp, (void *)-1);
     vm_next_free = (char *)object_space_head + vm_object_space_size;
 }
 
@@ -441,15 +444,61 @@ void page_free(phys_addr_t paddr)
     free_pages++;
 }
 
+struct heap_header
+{
+    size_t size;
+    struct heap_header *next;
+};
+
+static struct heap_header *heap_root = (void *)-1;
+
 void *heap_alloc(size_t size)
 {
-    (void)size;
-    return NULL;
+    // simple first-fit allocator, allocates downward from the head
+    // of the first block of sufficient size
+    // TODO: join heap blocks if there is not one of sufficient size
+    void *block = NULL;
+
+    // first attempt at allocation
+    if ((void *)-1 == heap_root)
+    {
+        heap_root = NULL;
+        struct heap_header *header = (void *)core_vmobject_node.key.address;
+        header->size = core_vmobject_node.key.size - sizeof(header->size);
+        heap_free((char *)header + sizeof(*header));
+    }
+
+    struct heap_header *header = heap_root;
+    size = align_next(size, sizeof(*header));
+
+    while (header)
+    {
+        if (header->size > size)
+        {
+            break;
+        }
+        header = header->next;
+    }
+
+    if (header)
+    {
+        header->size -= size + sizeof(*header);
+        header = (struct heap_header *)((char *)header + header->size);
+        header->size = size;
+        header->next = NULL;
+        block = (char *)header + sizeof(*header);
+    }
+
+    return block;
 }
 
 void heap_free(void *block)
 {
-    (void)block;
+    struct heap_header *header = (void *)
+        ((char *)block - sizeof(*header));
+
+    header->next = heap_root;
+    heap_root = header;
 }
 
 void *memory_alloc(size_t size)
@@ -478,14 +527,37 @@ void memory_free(void *block)
 
 void *vm_alloc_at(void *address, size_t size)
 {
-    (void)address;
-    (void)size;
-    return NULL;
+    // TODO: all of the vm_tree code is a bit of a mess. needs to be cleaned
+    // up and streamlined.
+    struct vm_tree_key key = {(uintptr_t)address, size};
+
+    // 1. check that there's a gap at the given location
+    struct vm_tree_node *node = vmt_search_key( &core_vm_tree, &key);
+
+    if (!node)
+    {
+        node = heap_alloc(sizeof(*node));
+        init_vm_node(node, &core_vmobject, address, (char *)address + size);
+    }
+    else
+    {
+        return NULL;
+    }
+
+    return address;
 }
 
 void *vm_alloc(size_t size)
 {
-    (void)size;
+    // TODO: gap-finding algorithm for failed allocations
+    void *address;
+
+    if (NULL != (address = vm_alloc_at(vm_next_free, size)))
+    {
+        vm_next_free = (char *)address + size;
+        return address;
+    }
+
     return NULL;
 }
 
