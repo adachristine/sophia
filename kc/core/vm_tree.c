@@ -287,13 +287,6 @@ struct vm_tree_node *vmn_predecessor_key(
     return P;
 }
 
-struct vm_tree_node *vmn_successor_key(
-        struct vm_tree_node *N,
-        struct vm_tree_key *key)
-{
-    struct vm_tree_node *P = NULL;
-}
-
 // search for the successor node for a given key
 struct vm_tree_node *vmn_successor_node(
         struct vm_tree_node *N)
