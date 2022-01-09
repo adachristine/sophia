@@ -63,8 +63,6 @@ struct vm_object
     page_fault_handler_func handler;
 };
 
-extern char kc_image_base;
-
 static struct page *const page_array = (struct page *)0xffffffd800000000;
 static int first_free_page_index = -1;
 static size_t page_array_entries = 0;
