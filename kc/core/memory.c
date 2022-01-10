@@ -2,6 +2,7 @@
 #include "kprint.h"
 #include "panic.h"
 #include "vm_tree.h"
+#include "vm_object.h"
 
 #include <stdint.h>
 
@@ -21,46 +22,13 @@
 
 #define align_next(v, a) (((uint64_t)v + a - 1) & ~(a - 1))
 
-typedef int (*page_fault_handler_func)(uint32_t code, void *address);
-
 static int core_image_handler(uint32_t code, void *address);
 static int core_vmobject_handler(uint32_t code, void *address);
-
-enum memory_space_flags
-{
-    VOID_MEMORY_SPACE = 0x00, // memory that cannot do anything, i.e. a guard page
-    TRANSLATION_MEMORY_SPACE = 0x01, // a mapping to a fixed location in memory
-    ANONYMOUS_MEMORY_SPACE = 0x02, // a mapping to an arbitrary location in memory
-    OBJECT_MEMORY_SPACE = 0x03, // a mapping managed by an underlying object
-
-    MEMORY_SPACE_TYPE_MASK = 0x0f, //
-
-    NOFAULT_MEMORY_FLAG = 0x10, // a mapping that cannot be resolved during a page fault
-    NOSWAP_MEMORY_FLAG = 0x20, // a mapping that cannot be swapped out
-    COW_MEMORY_FLAG = 0x40, // a mapping that is copy-on-write
-
-    MEMORY_SPACE_FLAGS_MASK = 0xf0,
-
-    INVALID_MEMORY_SPACE = 0xff
-};
 
 struct page
 {
     uint32_t next: 31;
     uint32_t used: 1;
-};
-
-enum vm_object_type
-{
-    NULL_VM_OBJECT, // a non-object. shouldn't even exist. an abomination unto man and god
-    TRANSLATION_VM_OBJECT, // a direct mapping between a physical and virtual address range
-    ANONYMOUS_VM_OBJECT, // a mapping that has no definite physical location
-};
-
-struct vm_object
-{
-    enum vm_object_type type;
-    page_fault_handler_func handler;
 };
 
 static struct page *const page_array = (struct page *)0xffffffd800000000;
