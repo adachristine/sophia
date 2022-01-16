@@ -4,6 +4,7 @@
 .extern _DYNAMIC
 .extern kc_image_base
 
+.hidden kc_entry
 .global kc_entry
 .type kc_entry, @function
 kc_entry:

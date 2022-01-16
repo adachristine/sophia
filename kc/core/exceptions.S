@@ -1,8 +1,7 @@
 .extern page_fault_handler
+.extern general_protection_handler
 
-.global page_fault_isr
-.type page_fault_isr, @function
-page_fault_isr:
+.macro ISR_STORE_REGISTERS
     /* just in case something tried to be clever before */
     cld
     /* push param registers */
@@ -12,9 +11,6 @@ page_fault_isr:
     push %rcx
     push %r8
     push %r9
-    /* collect parameters for page fault handler */
-    mov 48(%rsp), %rdi /* error code is first parameter */
-    mov %cr2, %rsi /* PFLA is next parameter */
     /* caller-saved registers */
     push %rax
     push %r10
@@ -26,13 +22,10 @@ page_fault_isr:
     push %r13
     push %r14
     push %r15
-    /* stack has to be aligned */
-    mov %rsp, %rbp
-    and $-16, %rsp
-    call page_fault_handler
-    mov %rbp, %rsp
-    /* TODO: test for error code here and panic() */
-    pop %r15
+.endm
+
+.macro ISR_RESTORE_REGISTERS
+    // restore all the registers
     pop %r14
     pop %r13
     pop %r12
@@ -47,8 +40,44 @@ page_fault_isr:
     pop %rdx
     pop %rsi
     pop %rdi
+.endm
+
+.macro ISR_CALL func
+    // align the stack for the call to the handler function
+    mov %rsp, %rbp
+    and $-16, %rsp
+    call \func
+    // restore stack pointer, possibly unaligned
+    mov %rbp, %rsp
+.endm
+
+.hidden page_fault_isr
+.global page_fault_isr
+.type page_fault_isr, @function
+page_fault_isr:
+    ISR_STORE_REGISTERS
+    /* collect parameters for page fault handler */
+    mov 48(%rsp), %rdi /* error code is first parameter */
+    mov %cr2, %rsi /* PFLA is next parameter */
+    /* stack has to be aligned */
+    ISR_CALL page_fault_handler
+    /* TODO: test for error code here and panic() */
+    ISR_RESTORE_REGISTERS
     /* unwind the error code from the stack */
     add $8, %rsp
     /* leave the isr */
     iretq
 .size page_fault_isr, . - page_fault_isr
+
+.hidden general_protection_isr
+.global general_protection_isr
+.type general_protection_isr, @function
+general_protection_isr:
+    ISR_STORE_REGISTERS
+    // TODO: parameters?
+    ISR_CALL general_protection_handler
+    add $8, %rsp
+    ISR_RESTORE_REGISTERS
+    iretq
+.size general_protection_isr, . - general_protection_isr
+

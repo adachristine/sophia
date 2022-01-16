@@ -2,7 +2,7 @@ ENTRY(kc_entry)
 
 SECTIONS
 {
-    PROVIDE(kc_image_base = .);
+    PROVIDE_HIDDEN(kc_image_base = .);
 
     . = sizeof_headers;
 
