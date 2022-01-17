@@ -516,9 +516,9 @@ void *vm_alloc_at(void *address, size_t size)
 void *vm_alloc(size_t size)
 {
     // TODO: gap-finding algorithm for failed allocations
-    void *address;
+    void *address = vm_alloc_at(vm_next_free, size);
 
-    if (NULL != (address = vm_alloc_at(vm_next_free, size)))
+    if (address)
     {
         vm_next_free = (char *)address + size;
         return address;
@@ -613,6 +613,14 @@ int page_fault_handler(uint32_t code, void *address)
         panic(UNHANDLED_FAULT);
     }
 
+    return 0;
+}
+
+int general_protection_handler(uint32_t code)
+{
+    //TODO: implement #gp handler
+    (void)code;
+    panic(UNHANDLED_FAULT);
     return 0;
 }
 
