@@ -1,18 +1,18 @@
 include ../../defaults.mk
 include ../defaults.mk
 
-VPATH := ../../lib ../
+VPATH := ../../lib ../ cpu/
 
 TARGET := kernel.os
 .DEFAULT: $(TARGET)
 
-CPPFLAGS += -I../../api
+CPPFLAGS += -I../../api -I.
 CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
 
 SOBJS := 
 GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o \
 	 kc_main.o main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
-	 vm_tree.o exceptions.o panic.o
+	 vm_tree.o exceptions.o panic.o msr.o 
 IOBJS :=
 
 # __attribute__((interrupt)) requires -mgeneral-regs-only

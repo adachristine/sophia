@@ -10,9 +10,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+//TODO: initialize vm before cpu?
+//      alternatively, split memory and/or cpu initialization steps
+
 unsigned long kc_main(struct kc_boot_data *data)
 {
-    (void)data;
     cpu_init();
     serial_init();
     kputs("<hacker voice> i'm in 3333\r\n");
