@@ -26,6 +26,7 @@
 
 .macro ISR_RESTORE_REGISTERS
     // restore all the registers
+    pop %r15
     pop %r14
     pop %r13
     pop %r12
@@ -57,7 +58,7 @@
 page_fault_isr:
     ISR_STORE_REGISTERS
     /* collect parameters for page fault handler */
-    mov 48(%rsp), %rdi /* error code is first parameter */
+    mov 120(%rsp), %rdi /* error code is first parameter */
     mov %cr2, %rsi /* PFLA is next parameter */
     /* stack has to be aligned */
     ISR_CALL page_fault_handler

@@ -3,6 +3,7 @@
 #include "kprint.h"
 #include "memory.h"
 #include "panic.h"
+#include "task.h"
 
 #include <kernel/entry.h>
 
@@ -19,6 +20,8 @@ unsigned long kc_main(struct kc_boot_data *data)
     serial_init();
     kputs("<hacker voice> i'm in 3333\r\n");
     memory_init(data);
-    halt();
+    task_init();
+
+    return 0;
 }
 

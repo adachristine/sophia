@@ -537,12 +537,12 @@ static uint64_t *get_kernel_pm2e(void *vaddr)
     return &kernel_pm2[kpm2_index(vaddr)];
 }
 
-
 int anonymous_page_handler(uint32_t code, void *address)
 {
     kputs("anonymous space fault\n");
     if (code & PAGE_PR)
     {
+        kputs("can't fault a present page\n");
         // there's no reason a protection violation should happen
         // in anonymous space
         panic(UNHANDLED_FAULT);

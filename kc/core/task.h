@@ -31,3 +31,5 @@ extern void cpu_set_thread(
         struct kc_thread_state *next,
         uint64_t *cpu_tss_rsp0);
 
+void task_init(void);
+
