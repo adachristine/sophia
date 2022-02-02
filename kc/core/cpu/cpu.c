@@ -270,16 +270,21 @@ void isr_install(int vec, void (*isr)(void), int trap, int ist)
         type = TRAP64_GATE;
     }
 
-    set_idt(vec, CODE_SUPER_SEG_INDEX << 3, (uint64_t)isr, type);
-    if (ist)
+    set_idt(vec, CODE_SUPER_SEG_INDEX << 3, (uintptr_t)isr, type);
+    // an IST greater than 7 is invalid 
+    if (ist && ist < 7)
     {
         set_ist(vec, ist);
+    }
+    else
+    {
+        panic(GENERAL_PANIC);
     }
 }
 
 void ist_install(int ist, void *stack)
 {
-    tss.ist[ist] = (uint64_t)stack;
+    tss.ist[ist] = (uintptr_t)stack;
 }
 
 void int_enable(void)
