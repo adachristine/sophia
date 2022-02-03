@@ -261,7 +261,7 @@ void exceptions_init(void)
     isr_install(PAGE_FAULT_VECTOR, &page_fault_isr, 0, 0);
 }
 
-void isr_install(int vec, void (*isr)(void), int trap, int ist)
+void isr_install(int vec, void (*isr)(void), int trap, unsigned ist)
 {
     enum gate_descriptor_type type = INT64_GATE;
 
@@ -272,11 +272,11 @@ void isr_install(int vec, void (*isr)(void), int trap, int ist)
 
     set_idt(vec, CODE_SUPER_SEG_INDEX << 3, (uintptr_t)isr, type);
     // an IST greater than 7 is invalid 
-    if (ist && ist < 7)
+    if (ist && ist <= 7)
     {
         set_ist(vec, ist);
     }
-    else
+    else if (ist && ist > 7)
     {
         panic(GENERAL_PANIC);
     }
