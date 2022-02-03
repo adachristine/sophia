@@ -329,8 +329,10 @@ static void init_vm_node(
     }
 }
 
-void memory_init(struct kc_boot_data *boot_data)
+void memory_init(void)
 {
+    struct kc_boot_data *boot_data = get_boot_data();
+
     init_create_page_array(
             boot_data->phys_memory_map.base,
             boot_data->phys_memory_map.entries);
@@ -339,21 +341,23 @@ void memory_init(struct kc_boot_data *boot_data)
             boot_data->object_space.size +
             (uintptr_t)boot_data->object_space.base, 1);
 
-    kputs("vm node 1\n");
+    kputs("static vm node 1\n");
     init_vm_node(
             &core_image_node,
             &core_image_object,
             &kc_image_base,
             object_space_head);
     core_image_node.object->handler = core_image_handler;
-    kputs("vm node 2\n");
+
+    kputs("static vm node 2\n");
     init_vm_node(
             &core_vmobject_node,
             &core_vmobject,
             object_space_head,
             (char *)object_space_head + vm_object_space_size);
     core_vmobject_node.object->handler = core_vmobject_handler;
-    kputs("vm node 3\n");
+
+    kputs("static vm node 3\n");
     init_vm_node(&core_pagemaps_node, NULL, vm_temp, (void *)-1);
     vm_next_free = (char *)object_space_head + vm_object_space_size;
 }

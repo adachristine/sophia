@@ -21,7 +21,7 @@ enum page_map_flags
     SIZE_MASK = 0xc,
 };
 
-void memory_init(struct kc_boot_data *boot_data);
+void memory_init(void);
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags);
 void page_unmap(void *vaddr);

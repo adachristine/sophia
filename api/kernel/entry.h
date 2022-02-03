@@ -32,3 +32,5 @@ struct kc_boot_data
     } acpi_info;
 };
 
+struct kc_boot_data *get_boot_data(void);
+
