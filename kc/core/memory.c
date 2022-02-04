@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-#include <kernel/component.h>
+#include <kc/kc.h>
 
 /* kernel virtual space guarantees
  * 
