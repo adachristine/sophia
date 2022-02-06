@@ -5,13 +5,13 @@
 
 #include <stdint.h>
 
-__attribute__((optimize("O3")))
+    __attribute__((optimize("O3")))
 int kputchar(int c)
 {
     return serial_putchar(c);
 }
 
-__attribute__((optimize("O3")))
+    __attribute__((optimize("O3")))
 int kputs(const char *s)
 {
     while (*s)
@@ -42,7 +42,7 @@ static char *convert_scalar(
     char *result = buffer + bufsz - 1;
 
     // result >= buffer condition ensures we don't overflow
-    
+
     while (value > 0 && result >= buffer)
     {
         *--result = stringdigits[value % base];
@@ -50,6 +50,18 @@ static char *convert_scalar(
     }
 
     return result;
+}
+
+static inline int print_scalar(uint64_t value, int base)
+{
+    char buffer[65];
+    char *s = convert_scalar(
+            value,
+            base,
+            buffer,
+            sizeof(buffer));
+    kputs(s);
+    return strlen(s);
 }
 
 int kvprintf(const char *restrict format, va_list arguments)
@@ -82,53 +94,17 @@ int kvprintf(const char *restrict format, va_list arguments)
                 }
 
             case 'x':
-                {
-                    char buffer[65];
-                    char *s = convert_scalar(
-                            va_arg(arguments, uint64_t),
-                            16,
-                            buffer,
-                            sizeof(buffer));
-                    count += strlen(s);
-                    kputs(s);
-                    break;
-                }
+                print_scalar(va_arg(arguments, uint64_t), 16);
+                break;
             case 'd':
-                {
-                    char buffer[65];
-                    char *s = convert_scalar(
-                            va_arg(arguments, uint64_t),
-                            10,
-                            buffer,
-                            sizeof(buffer));
-                    count += strlen(s);
-                    kputs(s);
-                    break;
-                }
+                print_scalar(va_arg(arguments, uint64_t), 10);
+                break;
             case 'o':
-                {
-                    char buffer[65];
-                    char *s = convert_scalar(
-                            va_arg(arguments, uint64_t),
-                            8,
-                            buffer,
-                            sizeof(buffer));
-                    count += strlen(s);
-                    kputs(s);
-                    break;
-                }
+                print_scalar(va_arg(arguments, uint64_t), 8);
+                break;
             case 'b':
-                {
-                    char buffer[65];
-                    char *s = convert_scalar(
-                            va_arg(arguments, uint64_t),
-                            2,
-                            buffer,
-                            sizeof(buffer));
-                    count += strlen(s);
-                    kputs(s);
-                    break;
-                }
+                print_scalar(va_arg(arguments, uint64_t), 2);
+                break;
 
             default:
                 break;
