@@ -30,6 +30,12 @@ static char *convert_scalar(
 {
     static const char *stringdigits = "0123456789abcdef";
 
+    // we cannot use a base > 16 currently
+    if (base > 16)
+    {
+        return NULL;
+    }
+
     // the string will be built from the lower-to-higher value, and the
     // result pointer will point to the first character of the string in
     // the supplied buffer
