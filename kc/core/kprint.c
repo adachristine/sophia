@@ -202,7 +202,7 @@ static struct specifier parse_specifier(const char *format, va_list arguments)
     switch (*begin)
     {
         // unexpected EOS
-        case '0':
+        case 0:
             result.type = INVALID_PRINT;
             return result;
         case 'c':
