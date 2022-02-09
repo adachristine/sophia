@@ -9,8 +9,9 @@ AS := $(TARGET)-as
 LD := $(TARGET)-ld
 OBJCOPY := objcopy
 
-CFLAGS += -ffreestanding -mno-red-zone -ggdb -std=c11 \
-          -Wall -Wextra -Werror -fno-stack-protector
+CFLAGS += -ffreestanding -mno-red-zone -ggdb -std=c2x \
+          -Wall -Wextra -Werror -fno-stack-protector \
+	  -Wpedantic
 
 CXXFLAGS += -ffreestanding -mno-red-zone -ggdb \
 	    -Wall -Wextra -Werror -fno-stack-protector
