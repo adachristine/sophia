@@ -40,19 +40,19 @@ enum specifier_flags
     LEFT_JUSTIFY_FLAG = 0x1,
     EXPLICIT_SIGN_FLAG = 0x2,
     PAD_SIGN_FLAG = 0x4,
+    SIGNED_TYPE_FLAG = 0x8,
     SIGN_FLAG_MASK = 0x6,
-    ALTERNATE_FORM_FLAG = 0x8,
-    ZERO_PAD_FLAG = 0x10,
+    ALTERNATE_FORM_FLAG = 0x10,
+    ZERO_PAD_FLAG = 0x20,
 };
 
-enum specifier_integer_format
+enum specifier_integer_base
 {
-    INVALID_FORMAT,
-    SIGNED_DEC_FORMAT,
-    UNSIGNED_DEC_FORMAT,
-    BIN_FORMAT,
-    OCT_FORMAT,
-    HEX_FORMAT
+    INVALID_BASE,
+    BIN_BASE = 2,
+    OCT_BASE = 8,
+    DEC_BASE = 10,
+    HEX_BASE = 16
 };
 
 enum specifier_integer_width
@@ -64,12 +64,19 @@ enum specifier_integer_width
     LONG_WIDTH = 64
 };
 
+struct method
+{
+    int (*write_character)(struct method *m, char c);
+    int (*write_string)(struct method *m, const char *s);
+    int count;
+};
+
 struct specifier
 {
     enum specifier_type type;
     enum specifier_flags flags;
     enum specifier_integer_width integer_width;
-    enum specifier_integer_format integer_format;
+    enum specifier_integer_base integer_base;
     int field_width;
     int field_precision;
     size_t length;
@@ -83,7 +90,7 @@ static struct specifier parse_specifier(const char *format, va_list arguments)
         INVALID_PRINT,
         INVALID_FLAGS,
         INVALID_WIDTH,
-        INVALID_FORMAT,
+        INVALID_BASE,
         0,
         0,
         0
@@ -148,6 +155,7 @@ static struct specifier parse_specifier(const char *format, va_list arguments)
 
     // step 3: check for type width arguments
     switch (*begin)
+    {
         case 0: // unexpected eos
             result.type = INVALID_PRINT;
             return result;
@@ -216,23 +224,24 @@ static struct specifier parse_specifier(const char *format, va_list arguments)
         case 'd':
         case 'i':
             result.type = INTEGER_PRINT;
-            result.integer_format = SIGNED_DEC_FORMAT;
+            result.flags |= SIGNED_TYPE_FLAG;
+            result.integer_base = DEC_BASE;
             break;
         case 'u':
             result.type = INTEGER_PRINT;
-            result.integer_format = UNSIGNED_DEC_FORMAT;
+            result.integer_base = DEC_BASE;
             break;
         case 'b':
             result.type = INTEGER_PRINT;
-            result.integer_format = BIN_FORMAT;
+            result.integer_base = BIN_BASE;
             break;
         case 'o':
             result.type = INTEGER_PRINT;
-            result.integer_format = OCT_FORMAT;
+            result.integer_base = OCT_BASE;
             break;
         case 'x':
             result.type = INTEGER_PRINT;
-            result.integer_format = HEX_FORMAT;
+            result.integer_base = HEX_BASE;
             break;
         case 'p':
             // TODO: use UINTPTR_T_WIDTH here?
@@ -240,7 +249,7 @@ static struct specifier parse_specifier(const char *format, va_list arguments)
             // i can do what i want it says "implementation-defined" in the spec
             result.field_precision = 8;
             result.type = INTEGER_PRINT;
-            result.integer_format = HEX_FORMAT;
+            result.integer_base = HEX_BASE;
             result.integer_width = LONG_WIDTH;
             result.flags = ALTERNATE_FORM_FLAG|ZERO_PAD_FLAG;
             break;
@@ -303,20 +312,24 @@ static char *convert_integer(
     return result;
 }
 
-static int print_character(struct specifier *spec, va_list arguments)
+static int print_character(
+        struct method *m,
+        struct specifier *spec,
+        va_list arguments)
 {
     (void)spec;
     // all specifier flags and etc. are ignored.
-    kputchar(va_arg(arguments, int));
-    return 1;
+    return m->write_character(m, va_arg(arguments, int));
 }
 
-static int print_string(struct specifier *spec, va_list arguments)
+static int print_string(
+        struct method *m,
+        struct specifier *spec,
+        va_list arguments)
 {
     (void)spec;
     // TODO: respect field width
-    const char *s = va_arg(arguments, const char *);
-    return kputs(s);
+    return m->write_string(m, va_arg(arguments, const char *));
 }
 
 static inline bool is_negative(uint64_t value, unsigned width)
@@ -336,20 +349,22 @@ static inline bool is_negative(uint64_t value, unsigned width)
     }
 }
 
-static int print_integer(struct specifier *spec, va_list arguments)
+static int print_integer(
+        struct method *m, 
+        struct specifier *spec, 
+        va_list arguments)
 {
     // 65 bytes is the maximum length that convert_integer will need
     // i.e. conversion of uintmax_t to binary plus NUL terminator
     // TODO: use UINTMAX_T_WIDTH + 1?
     char buffer[65] = {0};
     char *s;
-    int count = 0;
     bool negative = false;
     uint64_t value = va_arg(arguments, uint64_t);
-    unsigned base = 10;
+    int r = 0;
 
     // check if we need to bother with signs
-    if (spec->integer_format == SIGNED_DEC_FORMAT)
+    if (spec->flags & SIGNED_TYPE_FLAG)
     {
         if ((negative = is_negative(value, spec->integer_width)))
         {
@@ -358,91 +373,85 @@ static int print_integer(struct specifier *spec, va_list arguments)
 
         if (negative)
         {
-            kputchar('-');
-            count++;
+            r = m->write_character(m, '-');
         }
 
         else if (!negative && (spec->flags & SIGN_FLAG_MASK))
         {
             if (spec->flags & EXPLICIT_SIGN_FLAG)
             {
-                kputchar('+');
+                r = m->write_character(m, '+');
             }
             else
             {
-                kputchar(' ');
+                r = m->write_character(m, ' ');
             }
-            count++;
         }
     }
 
     // zero all the unnecessary bits
     value &= (2ULL << (spec->integer_width - 1)) - 1;
 
-    switch (spec->integer_format)
+    switch (spec->integer_base)
     {
-        case BIN_FORMAT:
+        case BIN_BASE:
             if (spec->flags & ALTERNATE_FORM_FLAG)
             {
-                kputs("0b");
-                count += 2;
+                r = m->write_string(m, "0b");
             }
-            base = 2;
             break;
-        case OCT_FORMAT:
+        case OCT_BASE:
             if (spec->flags & ALTERNATE_FORM_FLAG)
             {
-                kputchar('0');
-                count++;
+                r = m->write_character(m, '0');
             }
-            base = 8;
             break;
-        case HEX_FORMAT:
+        case HEX_BASE:
             if (spec->flags & ALTERNATE_FORM_FLAG)
             {
-                kputs("0x");
-                count += 2;
+                r = m->write_string(m, "0x");
             }
-            base = 16;
             break;
         default:
-            base = 10;
+            break;
     }
 
-    s = convert_integer(value, base, buffer, sizeof(buffer));
+    s = convert_integer(value, spec->integer_base, buffer, sizeof(buffer));
 
     if (s)
     {
-        count += kputs(s);
+        m->write_string(m, s);
     }
     else
     {
-        kputs("(INVALID)");
+        m->write_string(m, "(INVALID)");
+        r = -1;
     }
 
-    return count;
+    return r;
 }
 
-int kvprintf(const char *restrict format, va_list arguments)
+static int printf_internal(
+        struct method *m,
+        const char *restrict format,
+        va_list arguments)
 {
-    int count = 0;
+    int r = 0;
 
-    while (*format)
+    while (*format && !r)
     {
         // case 1: not a format specification
         if (*format != '%')
         {
-            kputchar(*format++);
-            count++;
+            r = m->write_character(m, *format++);
             continue;
         }
 
         // case 2: looks like a format specification, but isn't
         else if (*format == '%' && format[0] == format[1])
         {
-            kputchar('%');
+            r = m->write_character(m, '%');
             format += 2;
-            count++;
             continue;
         }
 
@@ -452,22 +461,52 @@ int kvprintf(const char *restrict format, va_list arguments)
         switch (spec.type)
         {
             case CHARACTER_PRINT:
-                count += print_character(&spec, arguments);
+                r = print_character(m, &spec, arguments);
                 break;
             case STRING_PRINT:
-                count += print_string(&spec, arguments);
+                r = print_string(m, &spec, arguments);
                 break;
             case INTEGER_PRINT:
-                count += print_integer(&spec, arguments);
+                r = print_integer(m, &spec, arguments);
                 break;
             default:
-                kputs("(INVALID)");
+                r = m->write_string(m, "(INVALID)");
                 return -1;
         }
         format += spec.length;
     }
 
-    return count;
+    return r;
+}
+
+static int kpm_write_character(struct method *m, char c)
+{
+    kputchar(c);
+    m->count++;
+    return 0;
+}
+
+static int kpm_write_string(struct method *m, const char *c)
+{
+    m->count += kputs(c);
+    return 0;
+}
+
+int kvprintf(const char *restrict format, va_list arguments)
+{
+    struct method m = {
+        kpm_write_character,
+        kpm_write_string,
+        0};
+    int r = printf_internal(&m, format, arguments);
+    if (!r)
+    {
+        return m.count;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 int kprintf(const char *restrict format, ...)
@@ -481,3 +520,4 @@ int kprintf(const char *restrict format, ...)
 
     return count;
 }
+
