@@ -148,7 +148,9 @@ static struct specifier parse_specifier(const char *format, va_list arguments)
 
     // step 3: check for type width arguments
     switch (*begin)
-    {
+        case 0: // unexpected eos
+            result.type = INVALID_PRINT;
+            return result;
         case 'h':
             {
                 if (begin[0] == begin[1])
