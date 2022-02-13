@@ -31,7 +31,7 @@ struct page
     uint32_t used: 1;
 };
 
-static struct page *const page_array = (struct page *)0xffffffd800000000;
+static struct page * const page_array = (struct page *)0xffffffd800000000;
 static int first_free_page_index = -1;
 static size_t page_array_entries = 0;
 static size_t free_pages = 0;
@@ -593,10 +593,12 @@ int anonymous_page_handler(uint32_t code, void *address)
     return 0;
 }
 
-int page_fault_handler(uint32_t code, void *address)
+int page_fault_handler(uint8_t vector, uint32_t code)
 {
-    (void)code;
-    kputs("page fault\n");
+    (void)vector;
+    void *address;
+    __asm__ volatile ("movq %%cr2, %0" : "=r"(address));
+    kprintf("page fault code=%d, pfla=%#lx\n", code, address);
     struct vm_object *o = vmt_get_object(&core_vm_tree, address);
     int result = 1;
     if (o)
@@ -620,10 +622,12 @@ int page_fault_handler(uint32_t code, void *address)
     return 0;
 }
 
-int general_protection_handler(uint32_t code)
+int general_protection_handler(uint8_t vector, uint32_t code)
 {
     //TODO: implement #gp handler
+    (void)vector;
     (void)code;
+    kputs("general protection violation\n");
     panic(UNHANDLED_FAULT);
     return 0;
 }

@@ -257,8 +257,12 @@ void cpu_init(void)
 
 void exceptions_init(void)
 {
-    isr_install(GENERAL_PROTECTION_VECTOR, &general_protection_isr, 0, 0);
-    isr_install(PAGE_FAULT_VECTOR, &page_fault_isr, 0, 0);
+    isr_install(
+            GENERAL_PROTECTION_EXCEPTION,
+            &general_protection_isr,
+            0,
+            0);
+    isr_install(PAGE_FAULT_EXCEPTION, &page_fault_isr, 0, 0);
 }
 
 void isr_install(int vec, void (*isr)(void), int trap, unsigned ist)
