@@ -1,65 +1,33 @@
 #include "exceptions.h"
+#include "interrupt.h"
 
 .macro EXCEPTION_BEGIN vec:req, code=0
     // just in case something tried to be clever before
     cld
     // push param registers
-    push %rdi
+    ISR_STORE_PARAM_REGS
     // store certain parameters
     movb $\vec,%dil
-    push %rsi
     .if \code
-    movq 16(%rsp), %rsi
+    movq ISR_PARAM_REGS_SIZE(%rsp), %rsi
     .else
     xor %rsi, %rsi
     .endif
-    push %rdx
-    push %rcx
-    push %r8
-    push %r9
     // caller-saved registers
-    push %rax
-    push %r10
-    push %r11
+    ISR_STORE_CALLER_REGS
     // callee-saved registers
-    push %rbx
-    push %rbp
-    push %r12
-    push %r13
-    push %r14
-    push %r15
+    ISR_STORE_CALLEE_REGS
 .endm
 
 .macro EXCEPTION_END vec:req, code=0
     // restore all the registers
-    pop %r15
-    pop %r14
-    pop %r13
-    pop %r12
-    pop %rbp
-    pop %rbx
-    pop %r11
-    pop %r10
-    pop %rax
-    pop %r9
-    pop %r8
-    pop %rcx
-    pop %rdx
-    pop %rsi
-    pop %rdi
+    ISR_RESTORE_CALLEE_REGS
+    ISR_RESTORE_CALLER_REGS
+    ISR_RESTORE_PARAM_REGS
     .if \code
     add $8, %rsp
     .endif
     iretq
-.endm
-
-.macro EXCEPTION_CALL func
-    // align the stack for the call to the handler function
-    mov %rsp, %rbp
-    and $-16, %rsp
-    call \func
-    // restore stack pointer, possibly unaligned
-    mov %rbp, %rsp
 .endm
 
 .macro EXCEPTION_DEFINE name:req, vec:req
@@ -69,7 +37,7 @@
     .else
     EXCEPTION_BEGIN \vec
     .endif
-    EXCEPTION_CALL \name\()_handler
+    ISR_CALL \name\()_handler
     .if \vec > 9 && \vec < 15 || \vec == 17 || \vec == 21 || \vec > 28 && \vec < 31
     EXCEPTION_END \vec, 1
     .else

@@ -13,7 +13,7 @@ SOBJS :=
 GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o \
 	 kc_main.o main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
 	 vm_tree.o exceptions.o panic.o msr.o task.o cpu_task.o \
-	 kcc_memory.o string.o
+	 kcc_memory.o string.o pic8259.o pic8259_isr.o pit8253.o
 IOBJS :=
 
 # __attribute__((interrupt)) requires -mgeneral-regs-only
