@@ -12,9 +12,11 @@ static char const *reason_strings[] = {
 noreturn void panic(enum panic_reason reason)
 {
     // TODO: kprintf() and friends
-    kputs("kernel panic: ");
-    kputs(reason_strings[reason]);
-    kputs("\n");
+    if (reason > sizeof(reason_strings) / sizeof(*reason_strings))
+    {
+        reason = 0;
+    }
+    kprintf("kernel panic: %s\n", reason_strings[reason]);
     halt();
 }
 

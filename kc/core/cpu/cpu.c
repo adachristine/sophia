@@ -5,6 +5,7 @@
 #include "msr.h"
 #include "task.h"
 #include "memory.h"
+#include "descriptor.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -24,58 +25,6 @@
 #define MSR_LSTAR 0xc0000082
 #define MSR_CSTAR 0xc0000083
 #define MSR_SFMASK 0xc0000084
-
-struct dtr64
-{
-    uint16_t limit;
-    uint64_t base;
-} __attribute__((packed));
-
-struct segment_descriptor
-{
-    uint16_t limit0;
-    uint16_t base0;
-    uint8_t base16;
-    uint8_t access;
-    uint8_t flags_limit16;
-    uint8_t base24;
-} __attribute__((packed));
-
-enum segment_descriptor_type
-{
-    CODE64_SUPER_SEG,
-    CODE64_USER_SEG,
-    DATA_SEG,
-    TASK64_SEG,
-};
-
-struct gate_descriptor
-{
-    uint16_t offset0;
-    uint16_t selector;
-    uint8_t ist;
-    uint8_t access;
-    uint16_t offset16;
-    uint64_t offset32;
-} __attribute__((packed));
-
-enum gate_descriptor_type
-{
-    INT64_GATE,
-    TRAP64_GATE,
-};
-
-struct task64_segment
-{
-    uint32_t reserved0;
-    uint64_t rsp0;
-    uint64_t rsp1;
-    uint64_t rsp2;
-    uint64_t reserved1;
-    uint64_t ist[7];
-    uint16_t reserved2;
-    uint16_t iomap_base;
-};
 
 static struct segment_descriptor gdt[GDT_ENTRIES];
 static struct gate_descriptor idt[IDT_ENTRIES];
@@ -126,11 +75,18 @@ static void set_gdt(int index,
     };
 }
 
-static void set_idt(int vec,
+static void set_idt(
+        int vec,
         uint16_t selector,
         uint64_t offset,
         enum gate_descriptor_type type)
 {
+    // TODO: panic() on attempt to set an idte outside of bounds?
+    if (vec >= IDT_ENTRIES)
+    {
+        return;
+    }
+
     idt[vec].offset0 = offset & 0xffff;
     idt[vec].selector = selector;
     idt[vec].offset16 = (offset >> 16) & 0xffff;
@@ -138,6 +94,9 @@ static void set_idt(int vec,
 
     switch (type)
     {
+        case EMPTY_GATE:
+            idt[vec].access = 0x0;
+            break;
         case INT64_GATE:
             idt[vec].access = 0x8e;
             break;
