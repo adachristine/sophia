@@ -6,13 +6,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-    __attribute__((optimize("O3")))
 int kputchar(int c)
 {
     return serial_putchar(c);
 }
 
-    __attribute__((optimize("O3")))
 int kputs(const char *s)
 {
     int count = 0;
@@ -301,13 +299,14 @@ static char *convert_integer(
     // at the last byte of the string
     char *result = buffer + bufsz - 1;
 
-    // result >= buffer condition ensures we don't overflow
+    // result >= buffer condition ensures we don't underflow 
 
-    while (value > 0 && result >= buffer)
+    do
     {
         *--result = stringdigits[value % base];
         value /= base;
-    }
+    } 
+    while (value > 0 && result >= buffer);
 
     return result;
 }
