@@ -80,7 +80,7 @@ struct specifier
     size_t length;
 };
 
-static struct specifier parse_specifier(const char *format, va_list arguments)
+static struct specifier parse_specifier(const char *format, va_list *arguments)
 {
     (void)arguments;
     struct specifier result = 
@@ -314,21 +314,21 @@ static char *convert_integer(
 static int print_character(
         struct method *m,
         struct specifier *spec,
-        va_list arguments)
+        va_list *arguments)
 {
     (void)spec;
     // all specifier flags and etc. are ignored.
-    return m->write_character(m, va_arg(arguments, int));
+    return m->write_character(m, va_arg(*arguments, int));
 }
 
 static int print_string(
         struct method *m,
         struct specifier *spec,
-        va_list arguments)
+        va_list *arguments)
 {
     (void)spec;
     // TODO: respect field width
-    return m->write_string(m, va_arg(arguments, const char *));
+    return m->write_string(m, va_arg(*arguments, const char *));
 }
 
 static inline bool is_negative(uint64_t value, unsigned width)
@@ -351,7 +351,7 @@ static inline bool is_negative(uint64_t value, unsigned width)
 static int print_integer(
         struct method *m, 
         struct specifier *spec, 
-        va_list arguments)
+        va_list *arguments)
 {
     // 65 bytes is the maximum length that convert_integer will need
     // i.e. conversion of uintmax_t to binary plus NUL terminator
@@ -359,7 +359,7 @@ static int print_integer(
     char buffer[65] = {0};
     char *s;
     bool negative = false;
-    uint64_t value = va_arg(arguments, uint64_t);
+    uint64_t value = va_arg(*arguments, uint64_t);
     int r = 0;
 
     // check if we need to bother with signs
@@ -433,7 +433,7 @@ static int print_integer(
 static int printf_internal(
         struct method *m,
         const char *restrict format,
-        va_list arguments)
+        va_list *arguments)
 {
     int r = 0;
 
@@ -497,7 +497,9 @@ int kvprintf(const char *restrict format, va_list arguments)
         kpm_write_character,
         kpm_write_string,
         0};
-    int r = printf_internal(&m, format, arguments);
+    va_list acopy;
+    va_copy(acopy, arguments);
+    int r = printf_internal(&m, format, &acopy);
     if (!r)
     {
         return m.count;
@@ -506,6 +508,7 @@ int kvprintf(const char *restrict format, va_list arguments)
     {
         return -1;
     }
+    va_end(acopy);
 }
 
 int kprintf(const char *restrict format, ...)
