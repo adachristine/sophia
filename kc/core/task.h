@@ -22,6 +22,7 @@ struct kc_thread
 {
     struct kc_thread *prev;
     struct kc_thread *next;
+    uint64_t time_elapsed;
     enum kc_thread_status status;
     struct kc_thread_state state;
 };

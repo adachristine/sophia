@@ -1,4 +1,5 @@
 #include "task.h"
+#include "timer.h"
 #include "memory.h"
 #include "panic.h"
 #include "cpu.h"
@@ -16,6 +17,15 @@ static void set_thread_status(enum kc_thread_status status);
 static void idle_task_thread(void);
 
 extern uint64_t *get_tss_rsp0(void);
+static uint64_t last_count = 0;
+
+void update_time_used(void)
+{
+    uint64_t current_count = timer_ticks();
+    uint64_t elapsed = current_count - last_count;
+    last_count = current_count;
+    current_task->time_elapsed += elapsed;
+}
 
 void task_set_thread(struct kc_thread *task)
 {
@@ -26,6 +36,8 @@ void task_set_thread(struct kc_thread *task)
 
 void task_schedule(void)
 {
+    kprintf("task_schedule() called @%lu ticks\n", last_count);
+    update_time_used();
     if (first_ready_task)
     {
         struct kc_thread *task = first_ready_task;
@@ -33,6 +45,7 @@ void task_schedule(void)
         task_set_thread(task);
     }
 }
+
 
 static void lock_scheduler(void)
 {
@@ -64,6 +77,7 @@ static void unblock_thread(struct kc_thread *thread)
         first_ready_task->next = thread;
         first_ready_task = thread;
     }
+    unlock_scheduler();
 }
 
 static void set_thread_status(enum kc_thread_status status)
@@ -80,11 +94,10 @@ static void idle_task_thread(void)
     while (1)
     {
         __asm__ volatile ("hlt;");
+        lock_scheduler();
+        task_schedule();
+        unlock_scheduler();
     }
-    kputs("scheduling\n");
-    lock_scheduler();
-    task_schedule();
-    unlock_scheduler();
 }
 
 noreturn void task_init(void)
