@@ -42,10 +42,13 @@ static void lock_scheduler(void)
 
 static void unlock_scheduler(void)
 {
-    if (1 == schedule_lock_cnt)
+    if (schedule_lock_cnt >= 1)
     {
         schedule_lock_cnt--;
-        __asm__ volatile("sti;");
+    }
+    if (schedule_lock_cnt == 0)
+    {
+        __asm__ volatile ("sti;");
     }
 }
 
@@ -86,6 +89,7 @@ static void idle_task_thread(void)
 
 noreturn void task_init(void)
 {
+    lock_scheduler();
     char *kernel_rsp0 = vm_alloc(4096);
     // TODO: make it so this isn't demand-allocated.
     kernel_rsp0[1] = 0;
@@ -95,12 +99,13 @@ noreturn void task_init(void)
         (struct kc_thread *)(first_task + 16384 - sizeof(*idle_thread));
     idle_thread->state.stack = (uintptr_t)idle_thread;
     idle_thread->state.stack_top = (uintptr_t)kernel_rsp0;
-    
+
     __asm__ volatile
         (
          "mov %%cr3, %%rax\n\t"
          "mov %%rax, 0(%%rsi)\n\t"
          "mov %%rcx, %%rsp\n\t"
+         "call unlock_scheduler\n\t"
          "jmp idle_task_thread\n\t"
          : "=m"(idle_thread->state.page_map)
          : "S"(&idle_thread->state.page_map),

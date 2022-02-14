@@ -4,6 +4,8 @@
 #include "memory.h"
 #include "panic.h"
 #include "task.h"
+#include "pic8259.h"
+#include "pit8253.h"
 
 #include <kernel/entry.h>
 
@@ -22,8 +24,11 @@ unsigned long kc_main(struct kc_boot_data *data)
 
     cpu_init();
     serial_init();
-    kputs("<hacker voice> i'm in 3333\r\n");
+    kprintf("sophia starting, boot data %#lx\n", boot_data);
+    kprintf("integer test %d %u\n", 3, 3);
     memory_init();
+    pic8259_init();
+    pit8253_init();
     task_init();
 
     return 0;

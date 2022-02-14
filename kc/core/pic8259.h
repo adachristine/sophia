@@ -14,7 +14,10 @@
 
 #include <stdint.h>
 
+typedef int (*pic8259_handler_func)(uint8_t irq);
+
 void pic8259_init(void);
+void pic8259_irq_install(uint8_t irq, pic8259_handler_func f);
 void pic8259_irq_begin(uint8_t irq);
 void pic8259_irq_end(uint8_t irq);
 void pic8259_irq_mask(uint8_t irq);

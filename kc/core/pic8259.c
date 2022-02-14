@@ -21,11 +21,18 @@
 #define OCW3_READ_ISR 0xb
 #define OCW3_EOI 0x20
 
-typedef int (*pic8259_handler_func)(uint8_t irq);
-
 pic8259_handler_func irq_handlers[PIC_ISR_COUNT];
 
-__attribute__((optimize("O3")))
+void pic8259_irq_install(uint8_t irq, pic8259_handler_func h)
+{
+    if (irq_handlers[irq])
+    {
+        kprintf("attempt to overwrite irq handler for %u\n", irq);
+        return;
+    }
+    irq_handlers[irq] = h;
+}
+
 static void wait(void)
 {
     // stall for a few cycles
