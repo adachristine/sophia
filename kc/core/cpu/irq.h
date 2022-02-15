@@ -3,6 +3,10 @@
 #include "interrupt.h"
 
 #ifndef __ASSEMBLER__
+
+void irq_lock(void);
+void irq_unlock(void);
+
 #else
 
 .macro IRQ_DECLARE name:req handler:req, irq:req, offset:req

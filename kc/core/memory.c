@@ -3,6 +3,7 @@
 #include "panic.h"
 #include "vm_tree.h"
 #include "vm_object.h"
+#include "cpu/mmu.h"
 
 #include <stdint.h>
 
@@ -109,13 +110,7 @@ static size_t init_get_max_paddr(struct memory_range *ranges, int count)
 
 static phys_addr_t get_kernel_pm4_phys(void)
 {
-    phys_addr_t pm4_phys;
-    __asm__ (
-            "mov %%cr3, %0\n\t"
-            : "=r"(pm4_phys)
-            );
-
-    return page_address(pm4_phys, 1);
+    return mmu_get_map();
 }
 
 static phys_addr_t get_kernel_pm3_phys(void)
@@ -382,7 +377,7 @@ void page_unmap(void *vaddr)
     {
         *pte = 0;
     }
-    __asm__ ("invlpg (%0)" :: "r"(vaddr));
+    mmu_invalidate(vaddr);
 }
 
 phys_addr_t page_alloc(void)

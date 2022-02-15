@@ -10,9 +10,9 @@ CPPFLAGS += -I../../api -I.
 CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
 
 SOBJS := 
-GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o \
+GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o mmu.o \
 	 kc_main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
-	 vm_tree.o exceptions.o panic.o msr.o task.o cpu_task.o \
+	 vm_tree.o exceptions.o panic.o msr.o task.o cpu_task.o irq.o \
 	 kcc_memory.o string.o pic8259.o pic8259_isr.o pit8253.o timer.o
 IOBJS :=
 

@@ -4,12 +4,11 @@
 #include "panic.h"
 #include "cpu.h"
 #include "kprint.h"
+#include "cpu/irq.h"
 
 struct kc_thread *current_task = NULL;
 struct kc_thread *first_ready_task = NULL;
 struct kc_thread *last_ready_task = NULL;
-
-static int schedule_lock_cnt = 0;
 
 static void lock_scheduler(void);
 static void unlock_scheduler(void);
@@ -49,20 +48,12 @@ void task_schedule(void)
 
 static void lock_scheduler(void)
 {
-    __asm__ volatile ("cli;");
-    schedule_lock_cnt++;
+    irq_lock();
 }
 
 static void unlock_scheduler(void)
 {
-    if (schedule_lock_cnt >= 1)
-    {
-        schedule_lock_cnt--;
-    }
-    if (schedule_lock_cnt == 0)
-    {
-        __asm__ volatile ("sti;");
-    }
+    irq_unlock();
 }
 
 static void unblock_thread(struct kc_thread *thread)
