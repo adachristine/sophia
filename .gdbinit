@@ -1,4 +1,3 @@
 target remote localhost:1234
-symbol-file kernel/kernel.os
-break kernel_entry
+add-symbol-file kc/core/kernel.os 0xffffffff80001000 -s .data 0xffffffff80005000
 
