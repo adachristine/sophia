@@ -130,6 +130,9 @@ noreturn void task_init(void)
     lock_scheduler();
     timesource = &pit8253_timer_source;
     timesource->start();
+    kprintf(
+            "starting task management, timesource delta %luns\n",
+            timesource->nanoseconds_delta());
     char *kernel_rsp0 = vm_alloc(4096);
     // TODO: make it so this isn't demand-allocated.
     // TODO: decouple the task management code from cpu-dependent task code

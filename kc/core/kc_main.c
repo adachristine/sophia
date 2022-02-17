@@ -29,6 +29,7 @@ unsigned long kc_main(struct kc_boot_data *data)
     memory_init();
     pic8259_init();
     pit8253_timer_source.init();
+    pit8253_timer_source.set_frequency(1);
     task_init();
 
     return 0;
