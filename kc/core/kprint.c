@@ -359,8 +359,22 @@ static int print_integer(
     char buffer[65] = {0};
     char *s;
     bool negative = false;
-    uint64_t value = va_arg(*arguments, uint64_t);
+    uint64_t value = 0;
     int r = 0;
+
+    switch (spec->integer_width)
+    {
+        case BYTE_WIDTH:
+        case SHORT_WIDTH:
+        case INT_WIDTH:
+            value = va_arg(*arguments, unsigned int);
+            break;
+        case LONG_WIDTH:
+            value = va_arg(*arguments, uint64_t);
+            break;
+        default:
+            return -1;
+    }
 
     // check if we need to bother with signs
     if (spec->flags & SIGNED_TYPE_FLAG)
