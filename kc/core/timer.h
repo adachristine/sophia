@@ -19,7 +19,3 @@ struct timer_source
     uint64_t (*nanoseconds_delta)(void);
 };
 
-uint64_t timer_ticks(void);
-void timer_sleep(uint64_t usec);
-void timer_sleep_until(uint64_t ticks);
-
