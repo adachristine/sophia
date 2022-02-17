@@ -1,6 +1,25 @@
 #pragma once
 #include <stdint.h>
 
-uint64_t timer_ticks(void);
+#define TIMER_MILLISECOND 1000ULL
+#define TIMER_MICROSECOND 1000000ULL
+#define TIMER_NANOSECOND 1000000000ULL
 
+struct timer_source
+{
+    const char *name;
+    void (*init)(void);
+    void (*start)(void);
+    void (*stop)(void);
+
+    void (*set_frequency)(uint32_t frequency);
+    uint32_t (*get_frequency)(void);
+
+    uint64_t (*nanoseconds_elapsed)(void);
+    uint64_t (*nanoseconds_delta)(void);
+};
+
+uint64_t timer_ticks(void);
+void timer_sleep(uint64_t usec);
+void timer_sleep_until(uint64_t ticks);
 

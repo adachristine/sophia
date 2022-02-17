@@ -28,7 +28,7 @@ unsigned long kc_main(struct kc_boot_data *data)
     kprintf("integer test %d %u\n", 3, 3);
     memory_init();
     pic8259_init();
-    pit8253_init();
+    pit8253_timer_source.init();
     task_init();
 
     return 0;

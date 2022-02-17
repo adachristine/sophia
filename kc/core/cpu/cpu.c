@@ -241,7 +241,7 @@ void isr_install(int vec, void (*isr)(void), int trap, unsigned ist)
     }
     else if (ist && ist > 7)
     {
-        panic(GENERAL_PANIC);
+        PANIC(GENERAL_PANIC);
     }
 }
 

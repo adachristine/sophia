@@ -320,7 +320,7 @@ static void init_vm_node(
     else
     {
         kputs("fatal: attempt to insert overlapping vm node\n");
-        panic(GENERAL_PANIC);
+        PANIC(GENERAL_PANIC);
     }
 }
 
@@ -544,7 +544,7 @@ int anonymous_page_handler(uint32_t code, void *address)
         kputs("can't fault a present page\n");
         // there's no reason a protection violation should happen
         // in anonymous space
-        panic(UNHANDLED_FAULT);
+        PANIC(UNHANDLED_FAULT);
     }
     // kernel page mappings are built different
     if (address >= (void *)&kc_image_base)
@@ -567,7 +567,7 @@ int anonymous_page_handler(uint32_t code, void *address)
             }
             else
             {
-                panic(OUT_OF_MEMORY);
+                PANIC(OUT_OF_MEMORY);
             }
         }
 
@@ -605,13 +605,13 @@ int page_fault_handler(uint8_t vector, uint32_t code)
         }
         if (result)
         {
-            panic(UNHANDLED_FAULT);
+            PANIC(UNHANDLED_FAULT);
         }
     }
     else
     {
         kputs("didn't find memory object\n");
-        panic(UNHANDLED_FAULT);
+        PANIC(UNHANDLED_FAULT);
     }
 
     return 0;
@@ -623,7 +623,7 @@ int general_protection_handler(uint8_t vector, uint32_t code)
     (void)vector;
     (void)code;
     kputs("general protection violation\n");
-    panic(UNHANDLED_FAULT);
+    PANIC(UNHANDLED_FAULT);
     return 0;
 }
 

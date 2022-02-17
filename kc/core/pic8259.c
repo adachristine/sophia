@@ -184,7 +184,7 @@ void pic8259_irq_begin(uint8_t irq)
     }
     else
     {
-        kprintf("%s of irq%hhu\n", "unhandled activation", irq);
+        kprintf("unhandled irq%hhu\n", irq);
     }
 
     pic8259_irq_end(irq);
