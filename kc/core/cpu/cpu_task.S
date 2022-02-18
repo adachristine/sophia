@@ -17,6 +17,9 @@ cpu_set_thread:
     *   rsi: pointer to control block of the current thread
     *   rdx: pointer to this cpu's task state segment esp0 field
     */
+    // test for attempt to switch to same thread
+    cmp %rdi,%rsi
+    je .Lnothing
     // test for a NULL origin thread
     test %rsi,%rsi
     // skip saving the state for a NULL origin thread
@@ -45,6 +48,7 @@ cpu_set_thread:
     pop %r13
     pop %r12
     pop %rbx
+.Lnothing: // do nothing if the threads are the same
     ret // leave into the new task
 .size cpu_set_thread, . - cpu_set_thread
 
