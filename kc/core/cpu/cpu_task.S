@@ -17,6 +17,10 @@ cpu_set_thread:
     *   rsi: pointer to control block of the current thread
     *   rdx: pointer to this cpu's task state segment esp0 field
     */
+    // test for a NULL origin thread
+    test %rsi,%rsi
+    // skip saving the state for a NULL origin thread
+    jz .Lnull_thread
     push %rbx
     push %r12
     push %r13
@@ -24,7 +28,8 @@ cpu_set_thread:
     push %r15
     push %rbp
     /* the current task will be in rsi */
-    mov %esp, 0(%rsi) // save the stack pointer for the current task
+    mov %rsp, 0(%rsi) // save the stack pointer for the current task
+.Lnull_thread:
     mov 0(%rdi),%rsp // new stack is the next's task's stack
     mov 8(%rdi),%rbx // top of the next task's kernel stack
     mov %rbx,0(%rdx) // save the esp0 to the tss

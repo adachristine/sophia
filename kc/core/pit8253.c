@@ -21,7 +21,7 @@
 
 static void pit8253_set_divisor(uint16_t divisor);
 
-static atomic_uint_fast64_t count = 0;
+static volatile atomic_uint_fast64_t count = 0;
 static uint16_t divisor = 0;
 
 const struct timer_source pit8253_timer_source =
@@ -82,7 +82,7 @@ uint32_t pit8253_get_frequency(void)
 
 uint64_t pit8253_nanoseconds_elapsed(void)
 {
-    return pit8253_nanoseconds_delta() * count;
+    return pit8253_nanoseconds_delta() * atomic_load(&count);
 }
 
 uint64_t pit8253_nanoseconds_delta(void)
