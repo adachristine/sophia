@@ -5,8 +5,8 @@
 enum kc_thread_status
 {
     READY,
-    STARTED,
-    YIELDED,
+    RUNNING,
+    SLEEPING,
     BLOCKED,
     TERMINATED
 };
@@ -20,9 +20,9 @@ struct kc_thread_state
 
 struct kc_thread
 {
-    struct kc_thread *prev;
     struct kc_thread *next;
     uint64_t time_elapsed;
+    uint64_t sleep_expiration;
     enum kc_thread_status status;
     struct kc_thread_state state;
 };
@@ -33,4 +33,5 @@ extern void cpu_set_thread(
         uint64_t *cpu_tss_rsp0);
 
 void task_init(void);
+void task_schedule(void);
 

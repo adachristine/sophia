@@ -6,6 +6,7 @@
 #include "task.h"
 #include "pic8259.h"
 #include "pit8253.h"
+#include "cpu/irq.h"
 
 #include <kernel/entry.h>
 
@@ -25,7 +26,6 @@ unsigned long kc_main(struct kc_boot_data *data)
     cpu_init();
     serial_init();
     kprintf("sophia starting, boot data %#lx\n", boot_data);
-    kprintf("integer test %d %u\n", 3, 3);
     memory_init();
     pic8259_init();
     pit8253_timer_source.init();
