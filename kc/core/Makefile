@@ -17,8 +17,8 @@ GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o mmu.o \
 IOBJS :=
 
 # __attribute__((interrupt)) requires -mgeneral-regs-only
-$(IOBJS): CFLAGS += -mgeneral-regs-only
-$(IOBJS) $(GOBJS): CFLAGS += -mcmodel=small -fPIC
+$(GOBJS): CFLAGS += -mgeneral-regs-only
+$(GOBJS): CFLAGS += -mcmodel=small -fPIC
 
 OBJS := $(SOBJS) $(GOBJS) $(IOBJS)
 DEPS := $(patsubst %.o,%.d,$(OBJS))
