@@ -10,6 +10,9 @@ void pit8253_stop(void);
 void pit8253_set_frequency(uint32_t frequency);
 uint32_t pit8253_get_frequency(void);
 
+int pit8253_append_callback(timer_callback func);
+void pit8253_delete_callback(timer_callback func);
+
 uint64_t pit8253_nanoseconds_elapsed(void);
 uint64_t pit8253_nanoseconds_delta(void);
 
