@@ -87,7 +87,7 @@ static bool irq_is_spurious(uint8_t irq)
     uint8_t isr_sec;
 
     // all other no other IRQs are 
-    if (irq != 7 || irq != 15)
+    if ((irq != 7) && (irq != 15))
     {
         return false;
     }
