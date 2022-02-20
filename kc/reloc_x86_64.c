@@ -1,4 +1,4 @@
-#include <kc/kc.h>
+#include <kc.h>
 
 #include <elf/elf64.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kc/lib.h>
+#include <lib.h>
 
 #include <kernel/entry.h>
 #include <kernel/memory/paging.h>

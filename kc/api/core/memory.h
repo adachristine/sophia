@@ -3,7 +3,7 @@
  */
 #pragma once
 
-#include <kc/kc.h>
+#include <kc.h>
 
 #include <stdint.h>
 

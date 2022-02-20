@@ -1,6 +1,6 @@
 #include "memory.h"
 
-#include <kc/core/memory.h>
+#include <core/memory.h>
 
 KC_EXPORT
 kc_phys_addr kcc_page_alloc(void)

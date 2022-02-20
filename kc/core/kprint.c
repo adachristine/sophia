@@ -1,7 +1,7 @@
 #include "kprint.h"
 #include "serial.h"
 
-#include <kc/lib.h>
+#include <lib.h>
 
 #include <stdint.h>
 #include <stdbool.h>

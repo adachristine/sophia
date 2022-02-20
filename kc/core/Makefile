@@ -6,7 +6,7 @@ VPATH := ../../lib ../ cpu/
 TARGET := kernel.os
 .DEFAULT: $(TARGET)
 
-CPPFLAGS += -I../../api -I.
+CPPFLAGS += -I../../api -I../api -I.
 CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
 
 SOBJS := 

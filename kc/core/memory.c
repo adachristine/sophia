@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#include <kc/kc.h>
+#include <kc.h>
 
 /* kernel virtual space guarantees
  * 
