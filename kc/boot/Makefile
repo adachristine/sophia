@@ -9,7 +9,7 @@ TARGET := efi.os
 
 CPPFLAGS += -I../../api -I ../api
 OBJS := entry_x86_64.o reloc_x86_64.o kc_main.o elf64.o memcmp.o memcpy.o \
-	memmove.o memset.o
+	memmove.o memset.o loader_paging.o
 
 DEPS := $(patsubst %.o,%.d,$(OBJS))
 

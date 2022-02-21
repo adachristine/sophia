@@ -1,7 +1,8 @@
+#include "loader_paging.h"
+
 #include <loader/efi/shim.h>
 #include <kernel/entry.h>
 #include <kernel/memory/range.h>
-#include <kernel/memory/paging.h>
 
 #include <stdbool.h>
 
@@ -49,14 +50,6 @@ static struct kc_boot_data *k_boot_data;
 static void *object_space_base;
 static size_t object_space_size;
 
-enum page_type
-{
-    INVALID_PAGE_TYPE = 0x0,
-    CODE_PAGE_TYPE = PAGE_PR,
-    RODATA_PAGE_TYPE = PAGE_PR,
-    DATA_PAGE_TYPE = PAGE_PR|PAGE_WR
-};
-
 static inline void debug()
 {
     __asm__ volatile
@@ -79,7 +72,7 @@ static inline void plog(CHAR16 *message)
     if (eto) eto->OutputString(eto, message);
 }
 
-static uint64_t *new_page_table(void)
+uint64_t *new_page_table(void)
 {
     EFI_PHYSICAL_ADDRESS table;
     EFI_STATUS status;
@@ -97,64 +90,6 @@ static uint64_t *new_page_table(void)
     return (uint64_t *)table;
 }
 
-static uint64_t *get_page_map(void)
-{
-    uint64_t map;
-    __asm__("mov %%cr3, %0" : "=r"(map));
-    return (uint64_t *)(page_address(map, 1));
-}
-
-void set_page_map(uint64_t *map)
-{
-    __asm__ volatile
-        (
-         "pushf\n\t"
-         "cli\n\t"
-         "mov %0, %%cr3\n\t"
-         "popf\n\t"
-         :
-         : "r"(map));
-}
-
-static uint64_t *get_page_table(uint64_t *map, uint64_t virt, int level)
-{
-    if ((level < 1) || (level > PAGE_MAP_LEVELS))
-    {
-        return NULL;
-    }
-
-    for (int i = PAGE_MAP_LEVELS; i > level; i--)
-    {
-        if (!map[pte_index(virt, i)])
-        {
-            uint64_t *next_map = new_page_table();
-            map[pte_index(virt, i)] = (uint64_t)next_map|PAGE_PR|PAGE_WR;
-            map = next_map;
-        }
-        else
-        {
-            map = (uint64_t *)page_address(map[pte_index(virt, i)], 1);
-        }
-    }
-
-    return map;
-}
-
-static uint64_t *get_page_entry(uint64_t *map, uint64_t virt)
-{
-    int level = 1;
-    uint64_t *table = get_page_table(map, virt, level);
-    return &table[pte_index(virt, level)];
-}
-
-static void map_page(void *map,
-                     uint64_t virt,
-                     uint64_t phys,
-                     enum page_type type)
-{
-    *get_page_entry(map, virt) = phys | type;
-}
-
 enum page_type get_page_type(Elf64_Phdr *phdr)
 {
     switch (phdr->p_flags)
@@ -170,20 +105,7 @@ enum page_type get_page_type(Elf64_Phdr *phdr)
     return INVALID_PAGE_TYPE;
 }
 
-static void map_pages(void *map,
-                      uint64_t virt,
-                      uint64_t phys,
-                      enum page_type type,
-                      size_t size)
-{
-    for (size_t offset = 0; offset < size; offset += page_size(1))
-    {
-        map_page(map, virt + offset, phys + offset, type);
-    }
-}
-
-#define KERNEL_SPACE_LOWER 0xffffffff80000000
-#define KERNEL_SPACE_UPPER 0xffffffffc0000000
+#define KERNEL_IMAGE_BASE 0xffffffff80000000
 
 static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
 {
@@ -204,19 +126,19 @@ static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
         }
     }
 
-
-    // Create fractal mappings
-    uint64_t *lower_page_dir = get_page_table(system_page_map,
-                                              KERNEL_SPACE_LOWER,
-                                              2);
-    uint64_t *upper_page_dir = get_page_table(system_page_map,
-                                              KERNEL_SPACE_UPPER,
-                                              2);
-
-    upper_page_dir[PAGE_TABLE_INDEX_MASK] =
-        (uint64_t)upper_page_dir|DATA_PAGE_TYPE;
-    upper_page_dir[PAGE_TABLE_INDEX_MASK - 1] =
-        (uint64_t)lower_page_dir|DATA_PAGE_TYPE;
+    // create a self-mapped page table at the very top of the virtual
+    // address space. this will give us 2MiB - 4KiB of virtual space to work
+    // with beginning at -2MiB .
+    //
+    // this is where any temporary mappings will be set up
+    // including the boot data tables that will be passed into the kernel
+    // and also the temporary window that the kernel will continue to use
+    //
+    map_page(
+            system_page_map,
+            -1ULL,
+            (uint64_t)get_page_table(system_page_map, -1ULL, 1),
+            DATA_PAGE_TYPE);
 }
 
 static void collect_boot_data(void)
@@ -343,6 +265,9 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
 
     set_page_map(system_page_map);
 
+    while (true)
+    __asm__("cli;hlt");
+
     k_boot_data = (struct kc_boot_data *)object_space_base;
     k_boot_data->object_space.base = sizeof(*k_boot_data) +
         (char *)object_space_base;
@@ -351,7 +276,7 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
     convert_memory_map();
 
     kc_entry_func kernel_entry = (kc_entry_func)
-        (KERNEL_SPACE_LOWER + ehdr->e_entry);
+        (KERNEL_IMAGE_BASE + ehdr->e_entry);
     kernel_entry(k_boot_data);
 
     return status;
@@ -391,10 +316,10 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
         Elf64_Ehdr *ehdr = (Elf64_Ehdr *)kernel_image.buffer_base;
 
         plog(L"mapping kernel pages\r\n");
-        create_kernel_maps(ehdr, (void *)KERNEL_SPACE_LOWER);
+        create_kernel_maps(ehdr, (void *)KERNEL_IMAGE_BASE);
         object_space_base =
             (void *)(page_align(kernel_image.buffer_size,1) +
-                    (char *)KERNEL_SPACE_LOWER);
+                    (char *)KERNEL_IMAGE_BASE);
 
         // add a tail of 64KiB to the kernel image
         uint64_t object_space_end = (uintptr_t)object_space_base +
