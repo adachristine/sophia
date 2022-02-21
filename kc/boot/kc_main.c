@@ -3,6 +3,7 @@
 #include <loader/efi/shim.h>
 #include <kernel/entry.h>
 #include <kernel/memory/range.h>
+#include <lib.h>
 
 #include <stdbool.h>
 
@@ -27,12 +28,17 @@ struct efi_video_data
     EFI_PIXEL_BITMASK mask;
 };
 
+struct efi_acpi_data
+{
+    void *rsdp;
+    int rsdp_version;
+};
+
 struct efi_boot_data
 {
     struct efi_memory_map memory_map;
     struct efi_video_data video_data;
-    void *acpi_rsdp;
-    unsigned long acpi_version;
+    struct efi_acpi_data acpi_data;
 };
 
 struct efi_loader_image kernel_image =
@@ -141,7 +147,53 @@ static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
             DATA_PAGE_TYPE);
 }
 
-static void collect_boot_data(void)
+static void collect_video_data(void)
+{
+}
+
+static void collect_acpi_data(void)
+{
+    EFI_GUID acpi2_guid = ACPI_20_TABLE_GUID;
+    EFI_GUID acpi_guid = ACPI_TABLE_GUID;
+
+    UINTN config_table_count = 
+        loader_interface->system_table->NumberOfTableEntries;
+    EFI_CONFIGURATION_TABLE *config_table =
+        loader_interface->system_table->ConfigurationTable;
+
+    for (UINTN i = 0; i < config_table_count; i++)
+    {
+        // check first for ACPI RSDP 2.0
+        if (!memcmp(
+                    &config_table[i].VendorGuid,
+                    &acpi2_guid,
+                    sizeof(EFI_GUID)))
+        {
+            plog(L"found ACPI RSDP 2.0\r\n");
+            // if we find the RSDP 2.0 table we can leave it at that
+            boot_data.acpi_data.rsdp = config_table[i].VendorTable;
+            boot_data.acpi_data.rsdp_version = 2;
+            break;
+        }
+        // if we get through the table without finding a v2 RSDP
+        // then we must continue to look for a v1 RSDP
+        // (unlikely)
+        if (!memcmp(
+                    &config_table[i].VendorGuid,
+                    &acpi_guid,
+                    sizeof(EFI_GUID)))
+        {
+            plog(L"found ACPI RSDP 1.0\r\n");
+            boot_data.acpi_data.rsdp = config_table[i].VendorTable;
+            boot_data.acpi_data.rsdp_version = 1;
+            // we must keep looking for the ACPI2.0 table GUID because
+            // it might be beyond this entry
+            continue;
+        }
+    }
+}
+
+static void collect_memory_map(void)
 {
     EFI_STATUS status;
 
@@ -186,6 +238,14 @@ static void collect_boot_data(void)
         plog(L"failed getting memory map\r\n");
         debug();
     }
+
+}
+
+static void collect_boot_data(void)
+{
+    collect_video_data();
+    collect_acpi_data();
+    collect_memory_map();
 }
 
 static void *kobject_alloc(size_t size)
