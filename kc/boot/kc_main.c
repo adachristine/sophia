@@ -149,6 +149,31 @@ static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
 
 static void collect_video_data(void)
 {
+    EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+    EFI_STATUS status;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *gop_interface;
+
+    status = e_bs->LocateProtocol(&gop_guid, NULL, (void **)&gop_interface);
+
+    if (EFI_ERROR(status))
+    {
+        plog(L"found no graphics devices\r\n");
+    }
+    else
+    {
+        plog(L"found graphics device\r\n");
+        EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *mode = gop_interface->Mode;
+        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info = mode->Info;
+
+        boot_data.video_data.buffer.base = mode->FrameBufferBase;
+        boot_data.video_data.buffer.size = mode->FrameBufferSize;
+
+        boot_data.video_data.width = info->HorizontalResolution;
+        boot_data.video_data.height = info->VerticalResolution;
+        boot_data.video_data.pitch = info->PixelsPerScanLine;
+        boot_data.video_data.format = info->PixelFormat;
+        boot_data.video_data.mask = info->PixelInformation;
+    }
 }
 
 static void collect_acpi_data(void)
