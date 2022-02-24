@@ -28,10 +28,11 @@
 // The full text of the CC-BY-SA 3.0 license can be found here:
 // https://en.wikipedia.org/wiki/Wikipedia:Text_of_Creative_Commons_Attribution-ShareAlike_3.0_Unported_License
 
-#include <stddef.h>
-#include <stdint.h>
-
 #include "vm_tree.h"
+#include "panic.h"
+#include "kprint.h"
+
+#include <lib.h>
 
 #define assert(expr)
 
@@ -64,6 +65,52 @@ static int compare_key(struct vm_tree_key const * const k1,
         struct vm_tree_key const * const k2)
 {
     return compare(k1->address, k1->size, k2->address, k2->size);
+}
+
+void vmt_init_node(
+        struct vm_tree *tree,
+        struct vm_tree_node *node,
+        struct vm_object *object,
+        void *base,
+        void *head)
+{
+    memset(node, 0, sizeof(*node));
+    node->key =
+        (struct vm_tree_key)
+        {
+            (uintptr_t)base,
+            (uintptr_t)head - (uintptr_t)base
+        };
+
+    struct vm_tree_node *ek = NULL;
+    if (!(ek = vmt_search_key(tree, &node->key)))
+    {
+        struct vm_tree_node *p = vmn_predecessor_key(
+                tree->root,
+                &node->key);
+        if (!p)
+        {
+            // the tree root should be in place of a missing predecessor
+            p = tree->root;
+        }
+        vmt_insert(
+                tree,
+                node,
+                p,
+                vmn_child_direction(node, p));
+        node->object = object;
+    }
+    else
+    {
+        kprintf("fatal: attempt to insert overlapping vm node\n"
+                "node 1: %p: %p @ %zu bytes\n"
+                "node 2: %p: %p @ %zu bytes\n",
+                node->key.address, node->key.size,
+                ek->key.address, ek->key.size);
+                
+        PANIC(GENERAL_PANIC);
+    }
+
 }
 
 static struct vm_tree_node* RotateDirRoot(
@@ -236,7 +283,7 @@ enum vm_tree_direction vmn_child_direction(
         struct vm_tree_node *p
 )
 {
-    if (p && compare_key(&p->key, &n->key) > 0)
+    if (p && (compare_key(&p->key, &n->key) > 0))
     {
         return LEFT;
     }

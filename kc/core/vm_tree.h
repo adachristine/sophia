@@ -30,6 +30,9 @@
 // The full text of the CC-BY-SA 3.0 license can be found here:
 // https://en.wikipedia.org/wiki/Wikipedia:Text_of_Creative_Commons_Attribution-ShareAlike_3.0_Unported_License
 
+#include <stdint.h>
+#include <stddef.h>
+
 enum vm_tree_direction
 {
     LEFT,
@@ -76,6 +79,13 @@ void vmt_insert(
 enum vm_tree_direction vmn_child_direction(
         struct vm_tree_node *n,
         struct vm_tree_node *p);
+
+void vmt_init_node(
+        struct vm_tree *tree,
+        struct vm_tree_node *node,
+        struct vm_object *object,
+        void *base,
+        void *head);
 
 void vmt_delete(struct vm_tree*, struct vm_tree_node*);
 

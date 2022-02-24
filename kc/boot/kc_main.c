@@ -9,6 +9,9 @@
 
 #include "../lib/elf.h"
 
+#define KERNEL_IMAGE_BASE 0xffffffff80000000
+#define OBJECT_SPACE_SIZE 131072
+
 struct efi_memory_map
 {
     struct memory_range buffer;
@@ -18,33 +21,19 @@ struct efi_memory_map
     UINT32 descver;
 };
 
-struct efi_video_data
-{
-    struct memory_range buffer;
-    UINT32 width;
-    UINT32 height;
-    UINT32 pitch;
-    EFI_GRAPHICS_PIXEL_FORMAT format;
-    EFI_PIXEL_BITMASK mask;
-};
-
-struct efi_acpi_data
-{
-    void *rsdp;
-    int rsdp_version;
-};
-
 struct efi_boot_data
 {
-    struct efi_memory_map memory_map;
-    struct efi_video_data video_data;
-    struct efi_acpi_data acpi_data;
+    struct efi_memory_map memory;
+    struct kc_boot_video_data video;
+    struct kc_boot_acpi_data acpi;
 };
 
 struct efi_loader_image kernel_image =
 {
     .path = L"\\adasoft\\sophia\\kernel.os"
 };
+
+static void *boot_data_alloc(size_t size);
 
 static struct efi_loader_interface *loader_interface;
 static struct efi_boot_data boot_data;
@@ -55,6 +44,24 @@ static struct kc_boot_data *k_boot_data;
 
 static void *object_space_base;
 static size_t object_space_size;
+
+static void *boot_data_alloc(size_t size)
+{
+    size = (size + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+
+    if (size > k_boot_data->buffer.available_size)
+    {
+        return NULL;
+    }
+
+    k_boot_data->buffer.available_size -= size;
+
+    void *buffer = k_boot_data->buffer.current;
+
+    k_boot_data->buffer.current += size;
+
+    return buffer;
+}
 
 static inline void debug()
 {
@@ -82,7 +89,7 @@ uint64_t *new_page_table(void)
 {
     EFI_PHYSICAL_ADDRESS table;
     EFI_STATUS status;
-    
+
     status = loader_interface->page_alloc(SystemMemoryType, page_size(1), &table);
 
     if (EFI_ERROR(status))
@@ -111,7 +118,6 @@ enum page_type get_page_type(Elf64_Phdr *phdr)
     return INVALID_PAGE_TYPE;
 }
 
-#define KERNEL_IMAGE_BASE 0xffffffff80000000
 
 static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
 {
@@ -125,10 +131,10 @@ static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
             uint64_t phys_begin = phdrs[i].p_offset + (uintptr_t)ehdr;
             size_t size = phdrs[i].p_memsz;
             map_pages(system_page_map,
-                      virt_begin,
-                      phys_begin,
-                      get_page_type(&phdrs[i]),
-                      size);
+                    virt_begin,
+                    phys_begin,
+                    get_page_type(&phdrs[i]),
+                    size);
         }
     }
 
@@ -139,12 +145,54 @@ static void create_kernel_maps(Elf64_Ehdr *ehdr, void *base)
     // this is where any temporary mappings will be set up
     // including the boot data tables that will be passed into the kernel
     // and also the temporary window that the kernel will continue to use
-    //
+
     map_page(
             system_page_map,
             -1ULL,
             (uint64_t)get_page_table(system_page_map, -1ULL, 1),
             DATA_PAGE_TYPE);
+
+    object_space_base = (unsigned char *)-page_size(2);
+    object_space_size = page_size(2) - page_size(1);
+}
+
+static size_t calculate_pixel_size(EFI_PIXEL_BITMASK bitmask)
+{
+    (void)bitmask;
+    return 0;
+}
+
+static size_t get_video_pitch(
+        UINTN scanline_pixels,
+        EFI_GRAPHICS_PIXEL_FORMAT format,
+        EFI_PIXEL_BITMASK bitmask)
+{
+    switch (format)
+    {
+        case PixelBlueGreenRedReserved8BitPerColor:
+        case PixelRedGreenBlueReserved8BitPerColor:
+            return sizeof(EFI_GRAPHICS_OUTPUT_BLT_PIXEL) * scanline_pixels;
+        case PixelBitMask:
+            return calculate_pixel_size(bitmask) * scanline_pixels;
+        default:
+            return 0;
+    }
+}
+
+static enum video_pixel_format get_video_format(
+        EFI_GRAPHICS_PIXEL_FORMAT format)
+{
+    switch (format)
+    {
+        case PixelBlueGreenRedReserved8BitPerColor:
+            return BGRA32BPP_VIDEO_FORMAT;
+        case PixelRedGreenBlueReserved8BitPerColor:
+            return RGBA32BPP_VIDEO_FORMAT;
+        case PixelBitMask:
+            return NO_VIDEO_FORMAT;
+        default:
+            return 0;
+    }
 }
 
 static void collect_video_data(void)
@@ -161,18 +209,24 @@ static void collect_video_data(void)
     }
     else
     {
-        plog(L"found graphics device\r\n");
         EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *mode = gop_interface->Mode;
         EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info = mode->Info;
+        plog(L"found graphics device\r\n");
 
-        boot_data.video_data.buffer.base = mode->FrameBufferBase;
-        boot_data.video_data.buffer.size = mode->FrameBufferSize;
-
-        boot_data.video_data.width = info->HorizontalResolution;
-        boot_data.video_data.height = info->VerticalResolution;
-        boot_data.video_data.pitch = info->PixelsPerScanLine;
-        boot_data.video_data.format = info->PixelFormat;
-        boot_data.video_data.mask = info->PixelInformation;
+        boot_data.video = (struct kc_boot_video_data){
+            {
+                RESERVED_MEMORY,
+                    mode->FrameBufferBase,
+                    mode->FrameBufferSize
+            },
+                info->HorizontalResolution,
+                info->VerticalResolution,
+                get_video_pitch(
+                        info->PixelsPerScanLine,
+                        info->PixelFormat,
+                        info->PixelInformation),
+                get_video_format(info->PixelFormat)
+        };
     }
 }
 
@@ -196,8 +250,8 @@ static void collect_acpi_data(void)
         {
             plog(L"found ACPI RSDP 2.0\r\n");
             // if we find the RSDP 2.0 table we can leave it at that
-            boot_data.acpi_data.rsdp = config_table[i].VendorTable;
-            boot_data.acpi_data.rsdp_version = 2;
+            boot_data.acpi.rsdp = config_table[i].VendorTable;
+            boot_data.acpi.version = ACPI_CURRENT;
             break;
         }
         // if we get through the table without finding a v2 RSDP
@@ -209,8 +263,8 @@ static void collect_acpi_data(void)
                     sizeof(EFI_GUID)))
         {
             plog(L"found ACPI RSDP 1.0\r\n");
-            boot_data.acpi_data.rsdp = config_table[i].VendorTable;
-            boot_data.acpi_data.rsdp_version = 1;
+            boot_data.acpi.rsdp = config_table[i].VendorTable;
+            boot_data.acpi.version = ACPI_LEGACY;
             // we must keep looking for the ACPI2.0 table GUID because
             // it might be beyond this entry
             continue;
@@ -222,22 +276,22 @@ static void collect_memory_map(void)
 {
     EFI_STATUS status;
 
-    boot_data.memory_map.size = 0;
+    boot_data.memory.size = 0;
 
-    status = e_bs->GetMemoryMap(&boot_data.memory_map.size,
+    status = e_bs->GetMemoryMap(&boot_data.memory.size,
             NULL,
-            &boot_data.memory_map.key,
+            &boot_data.memory.key,
             NULL,
             NULL);
 
     if (EFI_BUFFER_TOO_SMALL == status)
     {
         plog(L"getting memory map size\r\n");
-        boot_data.memory_map.buffer.size = boot_data.memory_map.size += 
+        boot_data.memory.buffer.size = boot_data.memory.size += 
             EFI_PAGE_SIZE;
         status = loader_interface->page_alloc(SystemMemoryType,
-                boot_data.memory_map.buffer.size,
-                (EFI_PHYSICAL_ADDRESS *)&boot_data.memory_map.buffer.base);
+                boot_data.memory.buffer.size,
+                (EFI_PHYSICAL_ADDRESS *)&boot_data.memory.buffer.base);
     }
 
     if (EFI_ERROR(status))
@@ -248,14 +302,14 @@ static void collect_memory_map(void)
     if (!EFI_ERROR(status))
     {
         plog(L"got the memory map size\r\n");
-        boot_data.memory_map.size = boot_data.memory_map.buffer.size;
+        boot_data.memory.size = boot_data.memory.buffer.size;
 
         plog(L"getting memory map\r\n");
-        status = e_bs->GetMemoryMap(&boot_data.memory_map.size,
-                (EFI_MEMORY_DESCRIPTOR *)boot_data.memory_map.buffer.base,
-                &boot_data.memory_map.key,
-                &boot_data.memory_map.descsize,
-                &boot_data.memory_map.descver);
+        status = e_bs->GetMemoryMap(&boot_data.memory.size,
+                (EFI_MEMORY_DESCRIPTOR *)boot_data.memory.buffer.base,
+                &boot_data.memory.key,
+                &boot_data.memory.descsize,
+                &boot_data.memory.descver);
     }
 
     if (EFI_ERROR(status))
@@ -268,67 +322,76 @@ static void collect_memory_map(void)
 
 static void collect_boot_data(void)
 {
+    plog(L"collecting boot data\r\n");
     collect_video_data();
     collect_acpi_data();
     collect_memory_map();
 }
 
-static void *kobject_alloc(size_t size)
+static void convert_acpi_data(void)
 {
-    if (!k_boot_data)
-        return NULL;
-    if (size > k_boot_data->object_space.size)
-        return NULL;
+    k_boot_data->acpi = boot_data.acpi;
+}
 
-    void *block = k_boot_data->object_space.base;
-    k_boot_data->object_space.base = (void *)(size + 
-            (char *)k_boot_data->object_space.base);
-    k_boot_data->object_space.size -= size;
-
-    return block;
+static void convert_video_data(void)
+{
+    k_boot_data->video = boot_data.video;
 }
 
 static void convert_memory_map(void)
 {
-    k_boot_data->phys_memory_map.entries = boot_data.memory_map.size /
-        boot_data.memory_map.descsize;
-    k_boot_data->phys_memory_map.base = (struct memory_range *)kobject_alloc(
-            k_boot_data->phys_memory_map.entries * 
-            sizeof(*k_boot_data->phys_memory_map.base));
+    k_boot_data->memory.count = 
+        boot_data.memory.size / boot_data.memory.descsize;
+    k_boot_data->memory.entries = 
+        boot_data_alloc(sizeof(struct memory_range) * 
+                k_boot_data->memory.count);
 
-    struct memory_range *ranges = k_boot_data->phys_memory_map.base;
-
-    for (size_t i = 0; i < k_boot_data->phys_memory_map.entries; i++)
+    for (size_t i = 0; i < k_boot_data->memory.count; i++)
     {
         EFI_MEMORY_DESCRIPTOR *desc;
-        desc = (EFI_MEMORY_DESCRIPTOR *)(boot_data.memory_map.buffer.base + 
+        desc = (EFI_MEMORY_DESCRIPTOR *)(boot_data.memory.buffer.base + 
                 i * 
-                boot_data.memory_map.descsize);
+                boot_data.memory.descsize);
 
         enum memory_range_type type;
         phys_addr_t base;
         size_t size;
-        
+
         base = desc->PhysicalStart;
         size = desc->NumberOfPages * EFI_PAGE_SIZE;
-        
+
         switch (desc->Type)
         {
             case EfiConventionalMemory:
             case EfiBootServicesData:
             case EfiBootServicesCode:
+            case EfiLoaderCode:
+            case EfiLoaderData:
                 type = AVAILABLE_MEMORY;
                 break;
             case SystemMemoryType:
                 type = SYSTEM_MEMORY;
                 break;
+            case EfiRuntimeServicesData:
+            case EfiRuntimeServicesCode:
+            case EfiACPIReclaimMemory:
+            case EfiACPIMemoryNVS:
+            case EfiPalCode:
+                type = FIRMWARE_MEMORY;
+                break;
+            case EfiMemoryMappedIO:
+            case EfiMemoryMappedIOPortSpace:
+                type = MMIO_MEMORY;
+                break;
+            case EfiUnusableMemory:
+                type = INVALID_MEMORY;
+                break;
             default:
                 type = RESERVED_MEMORY;
         }
-        
-        ranges[i].type = type;
-        ranges[i].base = base;
-        ranges[i].size = size;
+
+        k_boot_data->memory.entries[i]
+            = (struct memory_range){type, base, size};
     }
 }
 
@@ -340,7 +403,7 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
     collect_boot_data();
 
     status = e_bs->ExitBootServices(loader_interface->image_handle,
-            boot_data.memory_map.key);
+            boot_data.memory.key);
 
     if (EFI_ERROR(status))
     {
@@ -350,15 +413,18 @@ static EFI_STATUS enter_kernel(Elf64_Ehdr *ehdr)
 
     set_page_map(system_page_map);
 
-    while (true)
-    __asm__("cli;hlt");
-
     k_boot_data = (struct kc_boot_data *)object_space_base;
-    k_boot_data->object_space.base = sizeof(*k_boot_data) +
-        (char *)object_space_base;
-    k_boot_data->object_space.size = object_space_size;
+    k_boot_data->buffer.base = (unsigned char *)k_boot_data;
+    k_boot_data->buffer.max_size = object_space_size;
+
+    k_boot_data->buffer.current = 
+        k_boot_data->buffer.base + sizeof(*k_boot_data);
+    k_boot_data->buffer.available_size =
+        k_boot_data->buffer.max_size - sizeof(*k_boot_data);
 
     convert_memory_map();
+    convert_video_data();
+    convert_acpi_data();
 
     kc_entry_func kernel_entry = (kc_entry_func)
         (KERNEL_IMAGE_BASE + ehdr->e_entry);
@@ -390,8 +456,6 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
             !EFI_ERROR((status = interface->image_alloc(&kernel_image))) &&
             !EFI_ERROR((status = interface->image_load(&kernel_image))))
     {
-        plog(L"collecting boot data\r\n");
-
         plog(L"creating page tables\r\n");
         system_page_map = new_page_table();
         // parasitic map of uefi page tables is this ok???????
@@ -402,36 +466,30 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
 
         plog(L"mapping kernel pages\r\n");
         create_kernel_maps(ehdr, (void *)KERNEL_IMAGE_BASE);
-        object_space_base =
-            (void *)(page_align(kernel_image.buffer_size,1) +
-                    (char *)KERNEL_IMAGE_BASE);
 
-        // add a tail of 64KiB to the kernel image
-        uint64_t object_space_end = (uintptr_t)object_space_base +
-                page_size(1) * 16;
-
-        object_space_size = object_space_end -
-            (uintptr_t)object_space_base;
+        // set up the object space buffer
+        // this will be discarded after boot time (maybe idk)
+        plog(L"creating object space buffer\r\n");
         EFI_PHYSICAL_ADDRESS object_space_phys_base;
+        UINTN object_space_phys_size = OBJECT_SPACE_SIZE;
 
-        status = loader_interface->page_alloc(SystemMemoryType,
-                object_space_size,
+        status = loader_interface->page_alloc(
+                SystemMemoryType,
+                object_space_phys_size,
                 &object_space_phys_base);
 
         if (EFI_ERROR(status))
         {
-            plog(L"failed allocating object space");
+            plog(L"failed allocating physical buffer for object space\r\n");
             debug();
         }
 
-        map_pages(system_page_map,
+        map_pages(
+                system_page_map,
                 (uintptr_t)object_space_base,
                 object_space_phys_base,
                 DATA_PAGE_TYPE,
-                object_space_size);
-
-        e_bs->SetMem((void *)object_space_phys_base, object_space_size, 0);
-
+                object_space_phys_size);
         enter_kernel(ehdr);
     }
 

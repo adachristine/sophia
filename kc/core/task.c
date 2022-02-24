@@ -73,7 +73,7 @@ noreturn void task_init(void)
 
     // XXX: unfuck this mess at some point
     // XXX: make this also not demand-allocated or it's gonna fail
-    char *kernel_rsp0 = vm_alloc(4096);
+    char *kernel_rsp0 = vm_alloc(4096, VM_ALLOC_ANY);
     kernel_rsp0[1] = 0;
     *get_tss_rsp0() = (uintptr_t)kernel_rsp0 + 4096;
 
@@ -169,7 +169,7 @@ void update_time(void)
 
 static struct kc_thread *create_thread(void (*thread_f)(void))
 {
-    char *task_bottom = vm_alloc(16384);
+    char *task_bottom = vm_alloc(16384, VM_ALLOC_ANY);
     struct kc_thread *thread =
         (struct kc_thread *)(task_bottom + 16384 - sizeof(*thread));
 

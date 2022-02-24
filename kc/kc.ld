@@ -35,11 +35,11 @@ SECTIONS
 
     .text : ALIGN(4K)
     {
-        PROVIDE(kc_text_begin = .);
+        PROVIDE_HIDDEN(kc_text_begin = .);
         *(.text.start)
         *(.text)
         . = ALIGN(4K);
-        PROVIDE(kc_text_end = .);
+        PROVIDE_HIDDEN(kc_text_end = .);
     } =0xcc
 
     .dynamic : ALIGN(4K)
@@ -49,7 +49,7 @@ SECTIONS
 
     .data :
     {
-        PROVIDE(kc_data_begin = .);
+        PROVIDE_HIDDEN(kc_data_begin = .);
         *(.rodata)
         *(.data)
     }
@@ -63,8 +63,11 @@ SECTIONS
     .bss :
     {
         *(.bss)
-        PROVIDE(kc_data_end = .);
+        . = ALIGN(4K);
+        PROVIDE_HIDDEN(kc_data_end = .);
     }
+
+    PROVIDE_HIDDEN(kc_image_end = .);
 
     /DISCARD/ :
     {

@@ -1,7 +1,7 @@
 include ../../defaults.mk
 include ../defaults.mk
 
-VPATH := ../../lib ../ cpu/
+VPATH := ../../lib ../ cpu/ memory/
 
 TARGET := kernel.os
 .DEFAULT: $(TARGET)
@@ -13,7 +13,8 @@ SOBJS :=
 GOBJS := entry_x86_64.o reloc_x86_64.o kprint.o serial.o port.o mmu.o \
 	 kc_main.o memory.o memset.o memcpy.o memmove.o memcmp.o cpu.o \
 	 vm_tree.o exceptions.o panic.o msr.o task.o cpu_task.o irq.o \
-	 kcc_memory.o string.o pic8259.o pic8259_isr.o pit8253.o
+	 kcc_memory.o string.o pic8259.o pic8259_isr.o pit8253.o \
+	 page_early.o page_stack.o
 IOBJS :=
 
 # __attribute__((interrupt)) requires -mgeneral-regs-only

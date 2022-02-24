@@ -5,7 +5,7 @@
 KC_EXPORT
 kc_phys_addr kcc_page_alloc(void)
 {
-    return page_alloc();
+    return page_alloc(PAGE_ALLOC_ANY);
 }
 
 KC_EXPORT
