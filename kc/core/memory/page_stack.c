@@ -62,14 +62,15 @@ kc_phys_addr page_stack_alloc(enum page_alloc_flags type)
 
 void page_stack_free(kc_phys_addr page)
 {
-    // immediately release a reference
-    int referents = page_stack_dec_ref(page);
 
     // freeing a page only makes sense for present physical pages
     if (!page_stack_get_present(page))
     {
         return;
     }
+
+    // immediately release a reference
+    int referents = page_stack_dec_ref(page);
 
     // only actually free the page if it has no more references
     if (referents == 0)
