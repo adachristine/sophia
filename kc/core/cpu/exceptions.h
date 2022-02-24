@@ -21,10 +21,70 @@
 
 #ifndef __ASSEMBLER__
 
-void general_protection_isr();
-void general_protection_handler();
-void page_fault_isr();
-void page_fault_handler();
+#include "kprint.h"
+
+struct isr_context_param_regs
+{
+    uint64_t r9, r8, rcx, rdx, rsi, rdi;
+};
+
+struct isr_context_caller_regs
+{
+    uint64_t r11, r10, rax;
+};
+
+struct isr_context_callee_regs
+{
+    uint64_t r15, r14, r13, r12, rbp, rbx;
+};
+
+struct isr_context_entry_state
+{
+    uint64_t vector, code, rip, cs, rflags;
+};
+
+struct isr_context
+{
+    struct isr_context_callee_regs callee_regs;
+    struct isr_context_caller_regs caller_regs;
+    struct isr_context_param_regs param_regs;
+    struct isr_context_entry_state entry_state;
+};
+
+static inline void print_exception_context(struct isr_context *context)
+{
+    kprintf(
+            "exception %#hhx:%x context:\n"
+            "interrupt entry state:\n"
+            "rip: %#hx:%p rflags: %#x\n"
+            "parameter registers:\n" 
+            "rdi: %#lx rsi: %#lx rdx: %lx\n"
+            "rcx: %#lx r8: %#lx r9: %#lx\n"
+            "caller registers:\n"
+            "rax: %#lx r10: %#lx r11: %#lx\n"
+            "callee registers:\n"
+            "rbx: %#lx rbp: %#lx r12: %lx\n"
+            "r13: %#lx r14: %#lx r15: %#lx\n",
+            context->entry_state.vector, context->entry_state.code,
+            context->entry_state.cs, context->entry_state.rip,
+            context->entry_state.rflags,
+
+            context->param_regs.rdi, context->param_regs.rsi,
+            context->param_regs.rdx, context->param_regs.rcx,
+            context->param_regs.r8,context->param_regs.r9,
+
+            context->caller_regs.rax, context->caller_regs.r10,
+            context->caller_regs.r11,
+
+            context->callee_regs.rbx, context->callee_regs.rbp,
+            context->callee_regs.r12, context->callee_regs.r13, 
+            context->callee_regs.r14, context->callee_regs.r15);
+}
+
+void general_protection_isr(void);
+void general_protection_handler(struct isr_context *context);
+void page_fault_isr(void);
+void page_fault_handler(struct isr_context *context);
 
 void exceptions_init(void);
 

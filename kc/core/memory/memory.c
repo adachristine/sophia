@@ -15,6 +15,7 @@
 #include "panic.h"
 #include "vm_object.h"
 #include "cpu/mmu.h"
+#include "cpu/exceptions.h"
 
 #include <stdint.h>
 
@@ -589,10 +590,8 @@ int anonymous_page_handler(
     return 0;
 }
 
-int page_fault_handler(uint8_t vector, uint32_t code)
+void page_fault_handler(struct isr_context *context)
 {
-    (void)vector;
-
     void *address;
     __asm__ volatile ("movq %%cr2, %0" : "=r"(address));
 
@@ -601,28 +600,24 @@ int page_fault_handler(uint8_t vector, uint32_t code)
 
     if (!node)
     {
-        kprintf("error: page fault in unmanaged address %#lx\n",
-                address);
+        print_exception_context(context);
+        kprintf("error: page fault in unmanaged address %#lx\n", address);
         PANIC(UNHANDLED_FAULT);
     }
 
     if (!node->object->handler)
     {
+        print_exception_context(context);
         kprintf("error: vm object at %p has no fault handler\n");
         PANIC(UNHANDLED_FAULT);
     }
-
-    return node->object->handler(node, code, address);
 }
 
-int general_protection_handler(uint8_t vector, uint32_t code)
+void general_protection_handler(struct isr_context *context)
 {
     //TODO: implement #gp handler
-    (void)vector;
-    (void)code;
-
     kputs("general protection violation\n");
+    print_exception_context(context);
     PANIC(UNHANDLED_FAULT);
-    return 0;
 }
 
