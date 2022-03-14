@@ -82,7 +82,6 @@ struct specifier
 
 static struct specifier parse_specifier(const char *format, va_list *arguments)
 {
-    (void)arguments;
     struct specifier result = 
     {
         INVALID_PRINT,
@@ -150,6 +149,76 @@ static struct specifier parse_specifier(const char *format, va_list *arguments)
      *   b. if is numeric character, parse field precision via strtoul, add
      *      length of numeric string to begin.
      */
+    bool field_width_parsed = false;
+    bool field_precision_parsed = false;
+
+    while (!field_width_parsed || !field_precision_parsed)
+    {
+        switch (*begin)
+        {
+            case '.':
+                if (!field_width_parsed)
+                {
+                    result.field_width = 0;
+                    field_width_parsed = true;
+                    begin++;
+                }
+                else
+                {
+                    // the specifier is invalid!
+                    result.type = INVALID_PRINT;
+                }
+                break;
+            case '*':
+                {
+                    int w = *va_arg(*arguments, int *);
+                    if (!field_width_parsed)
+                    {
+                        result.field_width = w;
+                        field_width_parsed = true;
+                    }
+                    else
+                    {
+                        result.field_precision = w;
+                        field_precision_parsed = true;
+                    }
+                    begin++;
+                }
+                break;
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case '0':
+                {
+                    char *next;
+                    unsigned long long w = strtoull(begin, &next, 10);
+                    if (!field_width_parsed)
+                    {
+                        result.field_width = (int)w;
+                        field_width_parsed = true;
+                    }
+                    else if (!field_precision_parsed)
+                    {
+                        result.field_precision = (int)w;
+                        field_precision_parsed = true;
+                    }
+                    if (next > begin)
+                    {
+                        begin = next;
+                    }
+                }
+                break;
+            default:
+                field_width_parsed = true;
+                field_precision_parsed = true;
+        }
+    }
 
     // step 3: check for type width arguments
     switch (*begin)
@@ -245,7 +314,7 @@ static struct specifier parse_specifier(const char *format, va_list *arguments)
             // TODO: use UINTPTR_T_WIDTH here?
             // pointer type overrides all flags
             // i can do what i want it says "implementation-defined" in the spec
-            result.field_precision = 8;
+            result.field_precision = 16;
             result.type = INTEGER_PRINT;
             result.integer_base = HEX_BASE;
             result.integer_width = LONG_WIDTH;
@@ -277,8 +346,9 @@ static struct specifier parse_specifier(const char *format, va_list *arguments)
 
 static char *convert_integer(
         uint64_t value,
-        unsigned base, 
-        char *buffer, 
+        unsigned base,
+        int zpadding,
+        char *buffer,
         size_t bufsz)
 {
     static const char *stringdigits = "0123456789abcdef";
@@ -304,9 +374,15 @@ static char *convert_integer(
     do
     {
         *--result = stringdigits[value % base];
+        zpadding--;
         value /= base;
     } 
     while (value > 0 && result >= buffer);
+
+    while (zpadding-- > 0 && result >= buffer)
+    {
+        *--result = '0';
+    }
 
     return result;
 }
@@ -361,6 +437,7 @@ static int print_integer(
     bool negative = false;
     uint64_t value = 0;
     int r = 0;
+    unsigned zpad = 0;
 
     switch (spec->integer_width)
     {
@@ -429,7 +506,11 @@ static int print_integer(
             break;
     }
 
-    s = convert_integer(value, spec->integer_base, buffer, sizeof(buffer));
+    if (spec->flags & ZERO_PAD_FLAG)
+    {
+        zpad = spec->field_precision;
+    }
+    s = convert_integer(value, spec->integer_base, zpad, buffer, sizeof(buffer));
 
     if (s)
     {
