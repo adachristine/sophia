@@ -243,7 +243,20 @@ static void *page_map_at(
         }
     }
 
+    // take a reference to the page
+    page_inc_ref(paddr);
+
     return (char *)vaddr + offset;
+}
+
+int page_inc_ref(kc_phys_addr page)
+{
+    return page_stack_inc_ref(page);
+}
+
+int page_dec_ref(kc_phys_addr page)
+{
+    return page_stack_dec_ref(page);
 }
 
 #define VM_HEAP_SIZE 16 * page_size(2)
@@ -471,8 +484,7 @@ void *heap_alloc(size_t size)
 
 void heap_free(void *block)
 {
-    struct heap_header *header = (void *)
-        ((char *)block - sizeof(*header));
+    struct heap_header *header = (void *)((char *)block - sizeof(*header));
 
     header->next = heap_root;
     heap_root = header;
@@ -611,6 +623,8 @@ void page_fault_handler(struct isr_context *context)
         kprintf("error: vm object at %p has no fault handler\n");
         PANIC(UNHANDLED_FAULT);
     }
+
+    node->object->handler(node, context->entry_state.code, address);
 }
 
 void general_protection_handler(struct isr_context *context)

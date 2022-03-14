@@ -110,6 +110,7 @@ int page_stack_inc_ref(kc_phys_addr page)
 {
     unsigned index = page_stack_index(page);
     // taking a reference only makes sense for an allocated page
+    // and a page that's actually physical
     if (stack_state.stack[index].allocated)
     {
         return ++stack_state.stack[index].next_refs;

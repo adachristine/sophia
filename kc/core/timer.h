@@ -1,4 +1,5 @@
 #pragma once
+
 #include <stdint.h>
 
 #define TIMER_MILLISECOND 1000ULL
@@ -6,6 +7,9 @@
 #define TIMER_NANOSECOND 1000000000ULL
 
 typedef int (*timer_callback)(uint64_t nanoseconds);
+
+typedef uint64_t kc_time_stamp;
+typedef uint64_t kc_time_delta;
 
 struct timer_callback_list
 {

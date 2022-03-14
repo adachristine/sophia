@@ -56,6 +56,9 @@ void page_set_present(kc_phys_addr page);
 void page_set_allocated(kc_phys_addr page);
 void page_set_free(kc_phys_addr page);
 
+int page_inc_ref(kc_phys_addr page);
+int page_dec_ref(kc_phys_addr page); 
+
 void *page_map(phys_addr_t paddr, enum page_map_flags flags);
 void page_unmap(void *vaddr);
 
