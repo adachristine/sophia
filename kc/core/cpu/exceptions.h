@@ -56,15 +56,15 @@ static inline void print_exception_context(struct isr_context *context)
     kprintf(
             "exception %#hhx:%x context:\n"
             "interrupt entry state:\n"
-            "rip: %#hx:%p rflags: %#x\n"
+            "rip: %#hx:%p rflags: %#0.16lx\n"
             "parameter registers:\n" 
-            "rdi: %#lx rsi: %#lx rdx: %lx\n"
-            "rcx: %#lx r8: %#lx r9: %#lx\n"
+            "rdi: %#0.16lx rsi: %#0.16lx rdx: %#0.16lx\n"
+            "rcx: %#0.16lx r8: %#0.16lx r9: %#0.16lx\n"
             "caller registers:\n"
-            "rax: %#lx r10: %#lx r11: %#lx\n"
+            "rax: %#0.16lx r10: %#0.16lx r11: %#0.16lx\n"
             "callee registers:\n"
-            "rbx: %#lx rbp: %#lx r12: %lx\n"
-            "r13: %#lx r14: %#lx r15: %#lx\n",
+            "rbx: %#0.16lx rbp: %#0.16lx r12: %#0.16lx\n"
+            "r13: %#0.16lx r14: %#0.16lx r15: %#0.16lx\n",
             context->entry_state.vector, context->entry_state.code,
             context->entry_state.cs, context->entry_state.rip,
             context->entry_state.rflags,
