@@ -6,16 +6,14 @@ SECTIONS
 
     . = sizeof_headers;
 
-    .rel :
+    .rela.plt :
     {
-        *(.rel)
-        *(.rel.*)
+        *(.rela.plt)
     }
 
-    .rela :
+    .rela.dyn :
     {
-        *(.rel)
-        *(.rela.*)
+        *(.rela.dyn)
     }
 
     .hash :
@@ -38,18 +36,33 @@ SECTIONS
         PROVIDE_HIDDEN(kc_text_begin = .);
         *(.text.start)
         *(.text)
+    }
+
+    .plt :
+    {
+        *(.plt)
         . = ALIGN(4K);
         PROVIDE_HIDDEN(kc_text_end = .);
     } =0xcc
-
+    
     .dynamic : ALIGN(4K)
     {
+        PROVIDE_HIDDEN(kc_data_begin = .);
         *(.dynamic)
+    }
+
+    .got :
+    {
+        *(.got)
+    }
+
+    .got.plt :
+    {
+        *(.got.plt)
     }
 
     .data :
     {
-        PROVIDE_HIDDEN(kc_data_begin = .);
         *(.rodata)
         *(.data)
     }

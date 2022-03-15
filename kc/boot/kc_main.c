@@ -452,6 +452,8 @@ EFI_STATUS kc_main(struct efi_loader_interface *interface)
     e_bs = loader_interface->system_table->BootServices;
     eto = loader_interface->system_table->ConOut;
 
+    plog(L"opening kernel image\r\n");
+
     if (!EFI_ERROR((status = interface->image_open(&kernel_image))) &&
             !EFI_ERROR((status = interface->image_alloc(&kernel_image))) &&
             !EFI_ERROR((status = interface->image_load(&kernel_image))))

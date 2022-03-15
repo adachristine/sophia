@@ -91,7 +91,8 @@ struct Elf64_Dyn
 #define ELF64_R_TYPE(info) ((Elf64_Word)(info))
 #define ELF64_R_INFO(sym, type) (((Elf64_Xword)(sym)<<32)+(Elf64_Xword)(type))
 
-#define R_AMD64_RELATIVE 8
+#define R_X86_64_JUMP_SLOT 7
+#define R_X86_64_RELATIVE 8
 
 struct Elf64_Rel
 {

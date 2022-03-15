@@ -134,7 +134,7 @@ EFI_STATUS open_image(struct efi_loader_image *image)
     }
     else
     {
-        Print(L"failed opening image: %r\r\n", status);
+        Print(L"failed opening image %s: %r\r\n", image->path, status);
         return status;
     }
 
