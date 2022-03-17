@@ -45,7 +45,9 @@ enum specifier_integer_width
 struct method
 {
     int (*write_character)(struct method *m, char c);
+    int (*write_wcharacter)(struct method *m, wchar_t c);
     int (*write_string)(struct method *m, const char *s);
+    int (*write_wstring)(struct method *m, const wchar_t *s);
     void *output;
     int count;
 };
@@ -383,8 +385,11 @@ static int print_string(
         struct specifier *spec,
         va_list *arguments)
 {
-    (void)spec;
     // TODO: respect field width
+    if (spec->integer_width == LONG_WIDTH)
+    {
+        return m->write_wstring(m, va_arg(*arguments, const wchar_t *));
+    }
     return m->write_string(m, va_arg(*arguments, const char *));
 }
 
@@ -561,6 +566,13 @@ static int kfp_write_character(struct method *m, char c)
     return 0;
 }
 
+static int kfp_write_wcharacter(struct method *m, wchar_t c)
+{
+    kfputc((int)c, (FILE *)m->output);
+    m->count++;
+    return 0;
+}
+
 static int kfp_write_string(struct method *m, const char *c)
 {
     while (*c)
@@ -570,11 +582,22 @@ static int kfp_write_string(struct method *m, const char *c)
     return 0;
 }
 
+static int kfp_write_wstring(struct method *m, const wchar_t *s)
+{
+    while (*s)
+    {
+        m->write_wcharacter(m, *s++);
+    }
+    return 0;
+}
+
 int kvfprintf(FILE *f, const char *restrict format, va_list arguments)
 {
     struct method m = {
         kfp_write_character,
+        kfp_write_wcharacter,
         kfp_write_string,
+        kfp_write_wstring,
         (void *)f,
         0};
     va_list acopy;

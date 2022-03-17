@@ -6,11 +6,11 @@ VPATH := ../lib
 IMAGE := loader.efi
 BUILD := $(IMAGE) $(IMAGE:.efi=.debug.efi)
 
-CPPFLAGS += -I../api
+CPPFLAGS += -I../api -I../lib
 
 all: $(BUILD)
 
-OBJS := main_efi.o elf64.o memcmp.o memmove.o
+OBJS := main_efi.o elf64.o memcmp.o memmove.o kprintf.o strtoull.o
 DEPS := $(OBJS:.o=.d)
 
 IMAGE_SO := $(IMAGE:.efi=_efi.so)

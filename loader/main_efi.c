@@ -4,9 +4,15 @@
 
 #include <efi.h>
 #include <efidebug.h>
-#include <efilib.h>
 
-#include "../lib/elf.h"
+#include "elf.h"
+#include "kstdio.h"
+
+FILE *kstdout;
+FILE *kstderr;
+
+static EFI_SYSTEM_TABLE *gST;
+static EFI_BOOT_SERVICES *gBS;
 
 EFI_STATUS alloc_page(EFI_MEMORY_TYPE type,
         UINTN size,
@@ -19,10 +25,45 @@ EFI_STATUS load_image(struct efi_loader_image *image);
 
 static EFI_STATUS enter_shim(void);
 
+static const CHAR16 *efi_strerror(EFI_STATUS s);
+
 static struct efi_loader_image shim_image =
 {   
     .path = L"\\adasoft\\sophia\\efi.os"
 };
+
+static VOID *AllocatePool(UINTN size)
+{
+    EFI_STATUS status;
+    void *block = NULL;
+
+    if (gBS)
+    {
+        status = gBS->AllocatePool(
+                EfiLoaderData,
+                size,
+                &block);
+    }
+    else
+    {
+        status = EFI_NOT_READY;
+    }
+
+    if (!EFI_ERROR(status))
+    {
+        return block;
+    }
+
+    return NULL;
+}
+
+static VOID FreePool(void *block)
+{
+    if (gBS)
+    {
+        gBS->FreePool(block);
+    }
+}
 
 static struct efi_loader_interface loader_interface =
 {
@@ -35,9 +76,85 @@ static struct efi_loader_interface loader_interface =
     &load_image
 };
 
+static const CHAR16 *efi_status_strings[] =
+{
+    L"operation successful", // 0
+    L"image failed to load", // 1
+    L"invalid parameter", // 2
+    L"operation not supported", // 3
+    L"wrongly-sized buffer", // 4
+    L"buffer too small", // 5
+    L"not ready", // 6
+    L"device error", // 7
+    L"attempt to write to write-protected device", // 8
+    L"out of resoures", // 9
+    L"storage volume corrupted", // 10
+    L"storage volume full", // 11
+    L"no storage media", // 12
+    L"storage media changed", // 13
+    L"item not found", // 14
+    L"access denied", // 15
+    L"no response", // 16
+    L"no mapping",
+    L"device timed out",
+    L"protocol already started",
+    L"operation aborted",
+    L"ICMP error",
+    L"TFTP error",
+    L"network protocol error",
+    L"incompatible version",
+    L"security violation",
+    L"CRC32 checksum error",
+    L"end of storage media",
+    L"end of file",
+    L"invalid language",
+    L"security compromosed",
+    L"HTTP error"
+};
+
+/**
+static const CHAR16 *efi_warning_strings[] =
+{
+    L"operation successful",
+    L"warning: unknown glyph",
+    L"warning: file not deleted",
+    L"warning: file write failure",
+    L"warning: buffer too small",
+    L"warning: stale data",
+    L"warning: contains filesystem",
+    L"warning: system reset required"
+};
+**/
+
+int kfputc(int c, FILE *f)
+{
+    (void)f;
+    CHAR16 s[2] = {0,};
+    EFI_STATUS status;
+
+    if (loader_interface.system_table)
+    {
+        EFI_SIMPLE_TEXT_OUT_PROTOCOL *out = gST->ConOut;
+        s[0] = c;
+        status = out->OutputString(out, s);
+    }
+    else
+    {
+        return -1;
+    }
+
+    if (EFI_ERROR(status))
+    {
+        return -1;
+    }
+
+    return c;
+}
+
 EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 {
-    InitializeLib(image_handle, system_table);
+    gST = system_table;
+    gBS = system_table->BootServices;
     loader_interface.image_handle = image_handle;
     loader_interface.system_table = system_table;
 
@@ -45,22 +162,26 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 
     if (EFI_ERROR((status = open_image(&shim_image))))
     {
-        Print(L"error opening shim image: %r\r\n");
+        kprintf("error opening shim image: %ls\r\n", 
+                efi_strerror(status));
     }
 
     if (EFI_ERROR((status = allocate_image(&shim_image))))
     {
-        Print(L"error allocating shim image: %r\r\n");
+        kprintf("error allocating shim image: %ls\r\n",
+                efi_strerror(status));
     }
 
     if (EFI_ERROR((status = load_image(&shim_image))))
     {
-        Print(L"error loading shim image: %r\r\n");
+        kprintf("error loading shim image: %ls\r\n",
+                efi_strerror(status));
     }
 
     if (EFI_ERROR((status = enter_shim())))
     {
-        Print(L"error running shim image: %r\r\n");
+        kprintf("error running shim image: %ls\r\n",
+                efi_strerror(status));
     }
 
     if (shim_image.root)
@@ -118,7 +239,9 @@ EFI_STATUS open_image(struct efi_loader_image *image)
 
     if (EFI_ERROR(status))
     {
-        Print(L"failed locating image protocol: %r\r\n", status);
+        kprintf(
+                "failed locating image protocol: %ls\r\n", 
+                efi_strerror(status));
         return status;
     }
 
@@ -132,7 +255,9 @@ EFI_STATUS open_image(struct efi_loader_image *image)
 
     if (EFI_ERROR(status))
     {
-        Print(L"failed locating ESP file system: %r\r\n", status);
+        kprintf(
+                "failed locating ESP file system: %ls\r\n", 
+                efi_strerror(status));
         return status;
     }
 
@@ -140,11 +265,13 @@ EFI_STATUS open_image(struct efi_loader_image *image)
 
     if (EFI_ERROR(status))
     {
-        Print(L"failed opening root device: %r\r\n", status);
+        kprintf(
+                "failed opening root device: %ls\r\n", 
+                efi_strerror(status));
         return status;
     }
 
-    Print(L"opening image %s\r\n", image->path);
+    kprintf("opening image %ls\r\n", image->path);
 
     status = root->Open(root,
             &image->file,
@@ -158,7 +285,7 @@ EFI_STATUS open_image(struct efi_loader_image *image)
     }
     else
     {
-        Print(L"failed opening image %s: %r\r\n", image->path, status);
+        kprintf("failed opening image %ls: %r\r\n", image->path, status);
         return status;
     }
 
@@ -182,13 +309,13 @@ EFI_STATUS open_image(struct efi_loader_image *image)
          else
          {
             FreePool(phdrs);
-            Print(L"invalid image format detected\r\n");
+            kprintf("invalid image format detected\r\n");
             return EFI_INVALID_PARAMETER;
          }
     }
     else
     {
-        Print(L"failed reading shim image headers\r\n");
+        kprintf("failed reading shim image headers\r\n");
         return status;
     }
 
@@ -198,11 +325,11 @@ EFI_STATUS open_image(struct efi_loader_image *image)
     {
         image->buffer_size = elf_size(&ehdr,  phdrs);
         image->system_table = gST;
-        Print(L"elf image %d bytes\r\n", image->buffer_size);
+        kprintf("elf image %d bytes\r\n", image->buffer_size);
     }
     else
     {
-        Print(L"failed reading shim image segments\r\n");
+        kprintf("failed reading shim image segments\r\n");
     }
 
     FreePool(phdrs);
@@ -212,7 +339,7 @@ EFI_STATUS open_image(struct efi_loader_image *image)
 
 EFI_STATUS allocate_image(struct efi_loader_image *image)
 {
-    Print(L"allocating image %s\r\n", image->path);
+    kprintf("allocating image %ls\r\n", image->path);
     EFI_STATUS status;
 
     status = alloc_page(SystemMemoryType,
@@ -232,7 +359,7 @@ static EFI_STATUS read_image(struct efi_loader_image *image,
         UINTN offset,
         UINTN length)
 {
-    Print(L"reading %d bytes from image at 0x%8.0x %s\r\n",
+    kprintf("reading %d bytes from image at %p %ls\r\n",
         length,
         offset,
         image->path);
@@ -248,7 +375,7 @@ static EFI_STATUS read_image(struct efi_loader_image *image,
     }
     else
     {
-        Print(L"failed seeking shim image\r\n");
+        kprintf("failed seeking shim image: %ls\r\n", efi_strerror(status));
     } 
 
     return status;
@@ -284,8 +411,8 @@ EFI_STATUS load_image(struct efi_loader_image *image)
 
             if (!EFI_ERROR(status))
             {
-                Print(L"loaded segment 0x%16.0x of %d bytes "
-                        L"(file size %d bytes)\r\n",
+                kprintf("loaded segment %p of %d bytes "
+                        "(file size %d bytes)\r\n",
                         placement,
                         phdrs[i].p_memsz,
                         phdrs[i].p_filesz);
@@ -305,5 +432,10 @@ static EFI_STATUS enter_shim(void)
     entry = (kc_entry_func)(shim_image.buffer_base + ehdr->e_entry);
     status = entry(&loader_interface);
     return status;
+}
+
+static const CHAR16 *efi_strerror(EFI_STATUS s)
+{
+    return efi_status_strings[EFI_ERROR(s)];
 }
 
