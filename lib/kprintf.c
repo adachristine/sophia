@@ -1,27 +1,7 @@
-#include "kprint.h"
-#include "serial.h"
-
-#include <lib.h>
-
+#include <kstdio.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-
-int kputchar(int c)
-{
-    return serial_putchar(c);
-}
-
-int kputs(const char *s)
-{
-    int count = 0;
-    while (*s)
-    {
-        count++;
-        kputchar(*s++);
-    }
-
-    return count;
-}
 
 enum specifier_type
 {
@@ -66,6 +46,7 @@ struct method
 {
     int (*write_character)(struct method *m, char c);
     int (*write_string)(struct method *m, const char *s);
+    void *output;
     int count;
 };
 
@@ -573,28 +554,34 @@ static int printf_internal(
     return r;
 }
 
-static int kpm_write_character(struct method *m, char c)
+static int kfp_write_character(struct method *m, char c)
 {
-    kputchar(c);
+    kfputc((int)c, (FILE *)m->output);
     m->count++;
     return 0;
 }
 
-static int kpm_write_string(struct method *m, const char *c)
+static int kfp_write_string(struct method *m, const char *c)
 {
-    m->count += kputs(c);
+    while (*c)
+    {
+        m->write_character(m, *c++);
+    }
     return 0;
 }
 
-int kvprintf(const char *restrict format, va_list arguments)
+int kvfprintf(FILE *f, const char *restrict format, va_list arguments)
 {
     struct method m = {
-        kpm_write_character,
-        kpm_write_string,
+        kfp_write_character,
+        kfp_write_string,
+        (void *)f,
         0};
     va_list acopy;
     va_copy(acopy, arguments);
     int r = printf_internal(&m, format, &acopy);
+    va_end(acopy);
+
     if (!r)
     {
         return m.count;
@@ -603,13 +590,36 @@ int kvprintf(const char *restrict format, va_list arguments)
     {
         return -1;
     }
+}
+
+int kfprintf(FILE *f, const char *restrict format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+
+    int count = kvfprintf(f, format, arguments);
+
+    va_end(arguments);
+
+    return count;
+}
+
+int kvprintf(const char *restrict format, va_list arguments)
+{
+    va_list acopy;
+    va_copy(acopy, arguments);
+
+    int count = kvfprintf(kstdout, format, arguments);
+
     va_end(acopy);
+
+    return count;
 }
 
 int kprintf(const char *restrict format, ...)
 {
     va_list arguments;
-    va_start (arguments, format);
+    va_start(arguments, format);
 
     int count = kvprintf(format, arguments);
 

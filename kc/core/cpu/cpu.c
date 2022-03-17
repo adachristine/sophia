@@ -37,7 +37,7 @@ uint64_t *get_tss_rsp0(void)
 
 static void syscall_entry(void)
 {
-    kputs("system call\n");
+    kprintf("system call\n");
     halt();
 }
 

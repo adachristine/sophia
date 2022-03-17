@@ -100,24 +100,48 @@ EFI_STATUS free_page(EFI_PHYSICAL_ADDRESS base, UINTN size)
 EFI_STATUS open_image(struct efi_loader_image *image)
 {
     EFI_FILE_PROTOCOL *root;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *root_fs;
+    EFI_GUID root_fs_guid = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
 
     EFI_LOADED_IMAGE_PROTOCOL *loader_image;
+    EFI_GUID loader_image_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 
     EFI_STATUS status;
 
-    status = gBS->OpenProtocol(loader_interface.image_handle,
-            &LoadedImageProtocol,
+    status = gBS->OpenProtocol(
+            loader_interface.image_handle,
+            &loader_image_guid,
             (void  *)&loader_image,
             loader_interface.image_handle,
             NULL,
             EFI_OPEN_PROTOCOL_GET_PROTOCOL);
 
-
-    if (EFI_ERROR(status) ||
-            !(root = LibOpenRoot(loader_image->DeviceHandle)))
+    if (EFI_ERROR(status))
     {
-        Print(L"failed opening root device\r\n");
-        return EFI_NOT_FOUND;
+        Print(L"failed locating image protocol: %r\r\n", status);
+        return status;
+    }
+
+    status = gBS->OpenProtocol(
+            loader_image->DeviceHandle,
+            &root_fs_guid,
+            (void *)&root_fs,
+            loader_interface.image_handle,
+            NULL,
+            EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+
+    if (EFI_ERROR(status))
+    {
+        Print(L"failed locating ESP file system: %r\r\n", status);
+        return status;
+    }
+
+    status = root_fs->OpenVolume(root_fs, &root);
+
+    if (EFI_ERROR(status))
+    {
+        Print(L"failed opening root device: %r\r\n", status);
+        return status;
     }
 
     Print(L"opening image %s\r\n", image->path);

@@ -630,7 +630,7 @@ void page_fault_handler(struct isr_context *context)
 void general_protection_handler(struct isr_context *context)
 {
     //TODO: implement #gp handler
-    kputs("general protection violation\n");
+    kprintf("general protection violation\n");
     print_exception_context(context);
     PANIC(UNHANDLED_FAULT);
 }
