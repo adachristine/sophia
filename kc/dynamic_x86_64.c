@@ -18,14 +18,15 @@ void kc_dynamic_init(void *base, Elf64_Dyn *dyn)
     {
         switch(dyn->d_tag)
         {
-            // check for basic relocations first
             case DT_RELA:
                 reladyn.entries = (Elf64_Rela *)(dyn->d_ptr + (uintptr_t)base);
                 break;
             case DT_RELASZ:
                 reladyn.size = dyn->d_val;
                 break;
-            // might be combined with JMPRELs so check those too
+            // NOTE: ELF x86_64 only uses RELA
+            // possibly support doing REL also for platforms that want it
+            // (am i ever going to use other platforms?)
             case DT_JMPREL:
                 relaplt.entries = (Elf64_Rela *)(dyn->d_ptr + (uintptr_t)base);
                 break;

@@ -76,6 +76,7 @@ SECTIONS
     .bss :
     {
         *(.bss)
+        *(.dynbss)
         . = ALIGN(4K);
         PROVIDE_HIDDEN(kc_data_end = .);
     }
