@@ -8,6 +8,9 @@ TARGET := efi.os
 .DEFAULT: $(TARGET)
 
 CPPFLAGS += -I../../api -I ../api -I../../lib
+
+CFLAGS += -fshort-wchar
+
 OBJS := entry_x86_64.o reloc_x86_64.o dynamic_x86_64.o \
 	kc_main.o elf64.o memcmp.o memcpy.o \
 	memmove.o memset.o loader_paging.o

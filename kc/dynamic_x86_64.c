@@ -9,10 +9,10 @@ void kc_dynamic_init(void *base, Elf64_Dyn *dyn)
         size_t entsize;
     };
 
-    struct rela reladyn = {NULL,};
-    struct rela relaplt = {NULL,};
+    struct rela reladyn = {NULL, 0, 0};
+    struct rela relaplt = {NULL, 0, 0};
 
-    Elf64_Addr *gotplt;
+    Elf64_Addr *gotplt = NULL;
 
     while (dyn && dyn->d_tag != DT_NULL)
     {
@@ -46,8 +46,11 @@ void kc_dynamic_init(void *base, Elf64_Dyn *dyn)
 
     // peform relocations
     //
-    gotplt[1] = (uintptr_t)NULL;
-    gotplt[2] = (uintptr_t)kc_resolve_symbol;
+    if (gotplt)
+    {
+        gotplt[1] = (uintptr_t)NULL;
+        gotplt[2] = (uintptr_t)kc_resolve_symbol;
+    }
     kc_reloc(base, relaplt.entries, relaplt.size, relaplt.entsize);
     kc_reloc(base, reladyn.entries, reladyn.size, reladyn.entsize);
 }

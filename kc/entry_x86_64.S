@@ -6,14 +6,22 @@
 .global kc_entry
 .type kc_entry, @function
 kc_entry:
+    push %rbp
     push %rdi
     push %rsi
+    mov %rsp, %rbp
+    and $-0x10, %rsp
     lea kc_image_base(%rip), %rdi
     lea _DYNAMIC(%rip), %rsi
     call kc_dynamic_init
+    mov %rbp, %rsp
     pop %rsi
     pop %rdi
+    mov %rsp, %rbp
+    and $-0x10, %rsp
     call kc_main
+    mov %rbp, %rsp
+    pop %rbp
     ret
 .size kc_entry, . - kc_entry
 

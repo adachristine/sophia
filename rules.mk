@@ -15,7 +15,7 @@ COMPILE.info = $(info $$(CC) $@)
 
 %.os:
 	$(LINK.info)
-	@$(LINK.os)
+	$(LINK.os)
 
 %.debug.os: %.os
 	$(OBJCOPY) --only-keep-debug $< $@
@@ -23,15 +23,15 @@ COMPILE.info = $(info $$(CC) $@)
 
 %.o: %.c
 	$(COMPILE.info)
-	@$(COMPILE.c) -MMD -MP
+	$(COMPILE.c) -MMD -MP
 
 %.o: %.cpp
 	$(COMPILE.info)
-	@$(COMPILE.cpp) -MMD -MP
+	$(COMPILE.cpp) -MMD -MP
 
 %.o: %.S
 	$(COMPILE.info)
-	@$(COMPILE.S) -MMD -MP
+	$(COMPILE.S) -MMD -MP
 
 clean:
 	$(info $$(RM) $(CLEANLIST))

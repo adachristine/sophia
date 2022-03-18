@@ -32,6 +32,9 @@ static struct efi_loader_image shim_image =
     .path = L"\\adasoft\\sophia\\efi.os"
 };
 
+static CHAR16 *linebuf;
+static CHAR16 *linebuf_ptr;
+
 static VOID *AllocatePool(UINTN size)
 {
     EFI_STATUS status;
@@ -65,16 +68,7 @@ static VOID FreePool(void *block)
     }
 }
 
-static struct efi_loader_interface loader_interface =
-{
-    NULL,
-    NULL,
-    &alloc_page,
-    &free_page,
-    &open_image,
-    &allocate_image,
-    &load_image
-};
+static struct efi_loader_interface loader_interface;
 
 static const CHAR16 *efi_status_strings[] =
 {
@@ -129,14 +123,18 @@ static const CHAR16 *efi_warning_strings[] =
 int kfputc(int c, FILE *f)
 {
     (void)f;
-    CHAR16 s[2] = {0,};
-    EFI_STATUS status;
+    EFI_STATUS status = EFI_SUCCESS;
 
     if (loader_interface.system_table)
     {
         EFI_SIMPLE_TEXT_OUT_PROTOCOL *out = gST->ConOut;
-        s[0] = c;
-        status = out->OutputString(out, s);
+        *linebuf_ptr++ = c;
+        if (((linebuf_ptr - linebuf) == EFI_PAGE_SIZE - 2) || (c == L'\n'))
+        {
+            *linebuf_ptr++ = 0;
+            status = out->OutputString(out, linebuf);
+            linebuf_ptr = linebuf;
+        }
     }
     else
     {
@@ -153,12 +151,53 @@ int kfputc(int c, FILE *f)
 
 EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 {
+    loader_interface = (struct efi_loader_interface){
+        image_handle,
+        system_table,
+        alloc_page,
+        free_page,
+        open_image,
+        allocate_image,
+        load_image
+    };
+
     gST = system_table;
     gBS = system_table->BootServices;
-    loader_interface.image_handle = image_handle;
-    loader_interface.system_table = system_table;
 
     EFI_STATUS status;
+
+    if EFI_ERROR((status = alloc_page(
+                    EfiLoaderData, 
+                    EFI_PAGE_SIZE, 
+                    (EFI_PHYSICAL_ADDRESS *)&linebuf)))
+    {
+        gST->ConOut->OutputString(
+                gST->ConOut,
+                L"error allocating for line buffer");
+        return status;
+    }
+    else
+    {
+        gBS->SetMem(linebuf, EFI_PAGE_SIZE, 0);
+        linebuf_ptr = linebuf;
+    }
+
+    kprintf("loader interface %p\r\n"
+            "image_handle %p\r\n"
+            "system_table %p\r\n"
+            "page_alloc %p\r\n"
+            "page_free %p\r\n"
+            "image_open %p\r\n"
+            "image_alloc %p\r\n"
+            "image_load %p\r\n",
+            &loader_interface,
+            loader_interface.image_handle,
+            loader_interface.system_table,
+            loader_interface.page_alloc,
+            loader_interface.page_free,
+            loader_interface.image_open,
+            loader_interface.image_alloc,
+            loader_interface.image_load);
 
     if (EFI_ERROR((status = open_image(&shim_image))))
     {
@@ -214,7 +253,7 @@ EFI_STATUS alloc_page(EFI_MEMORY_TYPE type,
 
 EFI_STATUS free_page(EFI_PHYSICAL_ADDRESS base, UINTN size)
 {
-    return gBS->FreePages(base, size);
+    return gBS->FreePages(base, EFI_SIZE_TO_PAGES(size));
 }
 
 
@@ -304,7 +343,6 @@ EFI_STATUS open_image(struct efi_loader_image *image)
         {
             phdrs_size = ehdr.e_phentsize * ehdr.e_phnum;
             phdrs = AllocatePool(phdrs_size);
-            ASSERT(phdrs);
          }
          else
          {
@@ -366,8 +404,6 @@ static EFI_STATUS read_image(struct efi_loader_image *image,
 
     EFI_STATUS status;
 
-    ASSERT(buffer);
-
     if (!EFI_ERROR((status = image->file->SetPosition(image->file, offset))))
     {
         *buffer = (void *)(image->buffer_base + offset);
@@ -425,12 +461,23 @@ EFI_STATUS load_image(struct efi_loader_image *image)
 
 static EFI_STATUS enter_shim(void)
 {
-    EFI_STATUS status;
+    EFI_STATUS status = EFI_ABORTED;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)shim_image.buffer_base;
     kc_entry_func entry;
 
     entry = (kc_entry_func)(shim_image.buffer_base + ehdr->e_entry);
-    status = entry(&loader_interface);
+    kprintf("entering shim @%p\r\n", entry);
+
+    __asm__ volatile
+        (
+         "mov %0, %%rax\n\t"
+         "lea %1, %%rdi\n\t"
+         "call *%%rax\n\t"
+         :
+         : "m"(entry), "m"(loader_interface)
+         : "%rax", "%rdi"
+        );
+
     return status;
 }
 

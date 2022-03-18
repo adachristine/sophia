@@ -6,4 +6,5 @@
 *.efi
 *.log
 *.kate-swp
+*.pdb
 

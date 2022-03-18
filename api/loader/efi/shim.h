@@ -23,11 +23,14 @@ struct efi_loader_image
     UINTN buffer_size;
 };
 
-typedef EFI_STATUS (*efi_image_func)(struct efi_loader_image *image);
-typedef EFI_STATUS (*efi_page_alloc_func)(EFI_MEMORY_TYPE type,
+typedef EFI_STATUS (EFIAPI *efi_image_func)(struct efi_loader_image *image);
+typedef EFI_STATUS (EFIAPI *efi_page_alloc_func)(
+        EFI_MEMORY_TYPE type,
         UINTN size,
         EFI_PHYSICAL_ADDRESS *base);
-typedef EFI_STATUS (*efi_page_free_func)(EFI_PHYSICAL_ADDRESS base, UINTN size);
+typedef EFI_STATUS (EFIAPI *efi_page_free_func)(
+        EFI_PHYSICAL_ADDRESS base, 
+        UINTN size);
 
 struct efi_loader_interface
 {
@@ -42,6 +45,6 @@ struct efi_loader_interface
     efi_image_func image_load;
 };
 
-typedef EFI_STATUS (*efi_shim_entry_func)(struct efi_loader_image *image,
-    struct efi_loader_interface *interface);
+typedef EFI_STATUS
+(__attribute__((sysv_abi)) *efi_shim_entry_func)(struct efi_loader_interface *interface);
 

@@ -4,7 +4,7 @@ SECTIONS
 {
     PROVIDE_HIDDEN(kc_image_base = .);
 
-    . = sizeof_headers;
+    . = SIZEOF_HEADERS;
 
     .rela.plt :
     {

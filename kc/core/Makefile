@@ -19,7 +19,7 @@ IOBJS :=
 
 # __attribute__((interrupt)) requires -mgeneral-regs-only
 $(GOBJS): CFLAGS += -mgeneral-regs-only
-$(GOBJS): CFLAGS += -mcmodel=small -fPIC
+$(GOBJS): CFLAGS += -mcmodel=small
 
 OBJS := $(SOBJS) $(GOBJS) $(IOBJS)
 DEPS := $(patsubst %.o,%.d,$(OBJS))

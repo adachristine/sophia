@@ -4,18 +4,22 @@ include ../efi.mk
 VPATH := ../lib
 
 IMAGE := loader.efi
-BUILD := $(IMAGE) $(IMAGE:.efi=.debug.efi)
 
 CPPFLAGS += -I../api -I../lib
 
-all: $(BUILD)
+CFLAGS += --target=$(GNUEFIARCH)-unknown-windows -fshort-wchar -mno-avx \
+	  -mno-sse -mno-mmx -funsigned-char -Wno-pointer-sign -ggdb
 
-OBJS := main_efi.o elf64.o memcmp.o memmove.o kprintf.o strtoull.o
+LDFLAGS := --target=$(GNUEFIARCH)-unknown-windows -nostdlib -ggdb \
+	   -Wl,-entry:efi_main,-subsystem:efi_application -fuse-ld=lld-link
+
+all: $(IMAGE)
+
+OBJS := main_efi.o elf64.o memcmp.o memmove.o kprintf.o strtoull.o memset.o \
+	memcpy.o
 DEPS := $(OBJS:.o=.d)
 
-IMAGE_SO := $(IMAGE:.efi=_efi.so)
-$(IMAGE_SO): $(OBJS)
-.INTERMEDIATE: $(IMAGE_SO)
+$(IMAGE): $(OBJS)
 
 CLEANLIST := $(wildcard $(BUILD) $(OBJS))
 DCLEANLIST := $(CLEANLIST) $(wildcard $(DEPS))
