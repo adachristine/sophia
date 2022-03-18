@@ -178,6 +178,7 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
     }
     else
     {
+        gST->ConOut->Reset(gST->ConOut, FALSE);
         gBS->SetMem(linebuf, EFI_PAGE_SIZE, 0);
         linebuf_ptr = linebuf;
     }
