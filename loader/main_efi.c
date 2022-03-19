@@ -464,20 +464,12 @@ static EFI_STATUS enter_shim(void)
 {
     EFI_STATUS status = EFI_ABORTED;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)shim_image.buffer_base;
-    kc_entry_func entry;
+    efi_shim_entry_func entry;
 
-    entry = (kc_entry_func)(shim_image.buffer_base + ehdr->e_entry);
+    entry = (efi_shim_entry_func)(shim_image.buffer_base + ehdr->e_entry);
     kprintf("entering shim @%p\r\n", entry);
 
-    __asm__ volatile
-        (
-         "mov %0, %%rax\n\t"
-         "lea %1, %%rdi\n\t"
-         "call *%%rax\n\t"
-         :
-         : "m"(entry), "m"(loader_interface)
-         : "%rax", "%rdi"
-        );
+    status = entry(&loader_interface);
 
     return status;
 }
