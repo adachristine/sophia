@@ -15,7 +15,7 @@
     ISR_STORE_CALLEE_REGS
 .endm
 
-.macro EXCEPTION_END vec:req, code
+.macro EXCEPTION_END
     // restore all the registers
     ISR_RESTORE_CALLEE_REGS
     ISR_RESTORE_CALLER_REGS
@@ -33,11 +33,7 @@
     .endif
     movq %rsp, %rdi
     ISR_CALL \name\()_handler
-    .if \vec > 9 && \vec < 15 || \vec == 17 || \vec == 21 || \vec > 28 && \vec < 31
-    EXCEPTION_END \vec, 1
-    .else
-    EXCEPTION_END \vec
-    .endif
+    EXCEPTION_END
 .size \name\()_isr, . - \name\()_isr
 .endm
 

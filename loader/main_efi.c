@@ -3,7 +3,6 @@
 #include <kernel/entry.h>
 
 #include <efi.h>
-#include <efidebug.h>
 
 #include "elf.h"
 #include "kstdio.h"
