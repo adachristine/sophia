@@ -3,7 +3,7 @@
 #include <loader/efi/shim.h>
 #include <kernel/entry.h>
 #include <kernel/memory/range.h>
-#include <lib.h>
+#include <sophialib.h>
 
 #include <stdbool.h>
 

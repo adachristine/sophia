@@ -32,7 +32,7 @@
 #include "panic.h"
 #include "kprint.h"
 
-#include <lib.h>
+#include <sophialib.h>
 
 #define assert(expr)
 

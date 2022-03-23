@@ -5,7 +5,7 @@ VPATH := ../lib
 
 IMAGE := loader.efi
 
-CPPFLAGS += -I../api -I../lib
+CPPFLAGS += -I../api -I../lib -I$(EFIAPIDIR)
 
 CFLAGS += --target=$(GNUEFIARCH)-unknown-windows -fshort-wchar -mno-avx \
 	  -mno-sse -mno-mmx -funsigned-char -Wno-pointer-sign -ggdb \
