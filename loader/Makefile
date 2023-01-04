@@ -22,7 +22,7 @@ DEPS := $(OBJS:.o=.d)
 
 $(IMAGE): $(OBJS)
 
-CLEANLIST := $(wildcard $(BUILD) $(OBJS))
+CLEANLIST := $(wildcard $(BUILD) $(OBJS)) $(IMAGE:.efi=.pdb)
 DCLEANLIST := $(CLEANLIST) $(wildcard $(DEPS))
 
 include ../rules.mk
