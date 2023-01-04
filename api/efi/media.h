@@ -1,0 +1,148 @@
+#pragma once
+
+#include <efi/types.h>
+
+#define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID \
+{0x0964e5b22,0x6459,0x11d2,\
+        {0x8e,0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b}}
+
+typedef struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL 
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL;
+typedef struct EFI_FILE_PROTOCOL EFI_FILE_PROTOCOL;
+
+typedef EFI_STATUS (EFIAPI *EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME)(
+            IN EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *This,
+            OUT EFI_FILE_PROTOCOL **Root);
+
+struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL
+{
+    UINT64 Revision;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME OpenVolume;
+};
+
+typedef struct {
+    EFI_EVENT Event;
+    EFI_STATUS Status;
+    UINTN BufferSize;
+    VOID *Buffer;
+} EFI_FILE_IO_TOKEN;
+
+#define EFI_FILE_PROTOCOL_REVISION 0x00010000
+#define EFI_FILE_PROTOCOL_REVISION2 0x00020000
+#define EFI_FILE_PROTOCOL_LATEST_REVISION EFI_FILE_PROTOCOL_REVISION2
+#define EFI_FILE_MODE_READ 0x0000000000000001
+#define EFI_FILE_MODE_WRITE 0x0000000000000002
+#define EFI_FILE_MODE_CREATE 0x8000000000000000
+#define EFI_FILE_READ_ONLY 0x0000000000000001
+#define EFI_FILE_HIDDEN 0x0000000000000002
+#define EFI_FILE_SYSTEM 0x0000000000000004
+#define EFI_FILE_RESERVED 0x0000000000000008
+#define EFI_FILE_DIRECTORY 0x0000000000000010
+#define EFI_FILE_ARCHIVE 0x0000000000000020
+#define EFI_FILE_VALID_ATTR 0x0000000000000037
+
+typedef EFI_STATUS (EFIAPI *EFI_FILE_OPEN)(
+        IN EFI_FILE_PROTOCOL *This,
+        OUT EFI_FILE_PROTOCOL **NewHandle,
+        IN CHAR16 *FileName,
+        IN UINT64 OpenMode,
+        IN UINT64 Attributes);
+
+typedef EFI_STATUS (EFIAPI *EFI_FILE_CLOSE) (IN EFI_FILE_PROTOCOL *This);
+
+typedef EFI_STATUS (EFIAPI *EFI_FILE_READ) (
+        IN EFI_FILE_PROTOCOL *This,
+        IN OUT UINTN *BufferSize,
+        OUT VOID *Buffer);
+
+#define EFI_FILE_INFO_ID \
+{0x09576e92,0x6d3f,0x11d2,\
+    {0x8e39,0x00,0xa0,0xc9,0x69,0x72,0x3b}}
+
+#define EFI_FILE_READ_ONLY 0x0000000000000001
+#define EFI_FILE_HIDDEN 0x0000000000000002
+#define EFI_FILE_SYSTEM 0x0000000000000004
+#define EFI_FILE_RESERVED 0x0000000000000008
+#define EFI_FILE_DIRECTORY 0x0000000000000010
+#define EFI_FILE_ARCHIVE 0x0000000000000020
+#define EFI_FILE_VALID_ATTR 0x0000000000000037
+
+typedef EFI_STATUS (EFIAPI *EFI_FILE_SET_POSITION)(
+        IN EFI_FILE_PROTOCOL *This,
+        IN UINT64 Position);
+
+typedef EFI_STATUS (EFIAPI *EFI_FILE_GET_POSITION)(
+        IN EFI_FILE_PROTOCOL *This,
+        OUT UINT64 *Position);
+
+typedef struct
+{
+    UINT64 Size;
+    UINT64 FileSize;
+    UINT64 PhysicalSize;
+    EFI_TIME CreateTime ;
+    EFI_TIME LastAccessTime;
+    EFI_TIME ModificationTime;
+    UINT64 Attribute;
+#ifdef __cplusplus
+    CHAR16 *FileName;
+#else
+    CHAR16 FileName[];
+#endif
+}
+EFI_FILE_INFO;
+
+#define EFI_FILE_SYSTEM_INFO_ID \
+    {0x09576e93,0x6d3f,0x11d2,0x8e39,\
+        {0x00,0xa0,0xc9,0x69,0x72,0x3b}}
+
+typedef struct 
+{
+    UINT64 Size;
+    BOOLEAN ReadOnly;
+    UINT64 VolumeSize;
+    UINT64 FreeSpace;
+    UINT32 BlockSize;
+#ifdef __cplusplus
+    CHAR16 *VolumeLabel;
+#else
+    CHAR16 VolumeLabel[];
+#endif
+}
+EFI_FILE_SYSTEM_INFO;
+
+#define EFI_FILE_SYSTEM_VOLUME_LABEL_ID \
+{0xdb47d7d3,0xfe81,0x11d3,0x9a35,\
+    {0x00,0x90,0x27,0x3f,0xC1,0x4d}}
+
+typedef struct
+{
+    CHAR16 VolumeLabel[1];
+}
+EFI_FILE_SYSTEM_VOLUME_LABEL;
+
+typedef EFI_STATUS (EFIAPI *EFI_FILE_GET_INFO)(
+        IN EFI_FILE_PROTOCOL *This,
+        IN EFI_GUID *InformationType,
+        IN OUT UINTN *BufferSize,
+        OUT VOID *Buffer);
+
+struct EFI_FILE_PROTOCOL
+{
+    UINT64 Revision;
+    EFI_FILE_OPEN Open;
+    EFI_FILE_CLOSE Close;
+    EFIX_UNUSED_FUNC Delete;
+    EFI_FILE_READ Read;
+    EFIX_UNUSED_FUNC Write;
+    EFI_FILE_GET_POSITION GetPosition;
+    EFI_FILE_SET_POSITION SetPosition;
+    EFI_FILE_GET_INFO GetInfo;
+    EFIX_UNUSED_FUNC SetInfo;
+    EFIX_UNUSED_FUNC Flush;
+    EFIX_UNUSED_FUNC OpenEx;
+    EFIX_UNUSED_FUNC ReadEx;
+    EFIX_UNUSED_FUNC WriteEx;
+    EFIX_UNUSED_FUNC FlushEx;
+};
+

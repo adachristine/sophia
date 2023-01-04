@@ -2,8 +2,8 @@
 
 #include <kernel/entry.h>
 
-#include <efi.h>
-#include <efidebug.h>
+#include <efi/types.h>
+#include <efi/error.h>
 
 #include "elf.h"
 #include "kstdio.h"
@@ -127,7 +127,7 @@ int kfputc(int c, FILE *f)
 
     if (loader_interface.system_table)
     {
-        EFI_SIMPLE_TEXT_OUT_PROTOCOL *out = gST->ConOut;
+        EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *out = gST->ConOut;
         *linebuf_ptr++ = c;
         if (((linebuf_ptr - linebuf) == EFI_PAGE_SIZE - 2) || (c == L'\n'))
         {

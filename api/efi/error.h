@@ -1,0 +1,13 @@
+#pragma once
+
+#define EFI_ERROR(status) ((INTN)status < 0)
+
+#define EFI_ERROR_CODE(code) (INTN_MIN|code)
+
+#define EFI_SUCCESS 0
+#define EFI_INVALID_PARAMETER EFI_ERROR_CODE(2)
+#define EFI_NOT_READY EFI_ERROR_CODE(6)
+#define EFI_ABORTED EFI_ERROR_CODE(21)
+#define EFI_NOT_FOUND EFI_ERROR_CODE(14)
+#define EFI_BUFFER_TOO_SMALL EFI_ERROR_CODE(5)
+

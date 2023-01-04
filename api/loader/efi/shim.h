@@ -2,7 +2,9 @@
 
 #include <loader/shim.h>
 
-#include <efi.h>
+#include <efi/defs.h>
+#include <efi/media.h>
+#include <efi/tables.h>
 
 #ifdef __ELF__
     #define EFIEXPORT __attribute__((visibility("default"))) 
