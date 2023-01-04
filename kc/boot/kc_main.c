@@ -1,5 +1,9 @@
 #include "loader_paging.h"
 
+#include <efi/graphics.h>
+#include <efi/acpi.h>
+#include <efi/error.h>
+
 #include <loader/efi/shim.h>
 #include <kernel/entry.h>
 #include <kernel/memory/range.h>
@@ -39,7 +43,7 @@ static struct efi_loader_interface *loader_interface;
 static struct efi_boot_data boot_data;
 static EFI_BOOT_SERVICES *e_bs = NULL;
 static uint64_t *system_page_map = NULL;
-static SIMPLE_TEXT_OUTPUT_INTERFACE *eto;
+static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *eto;
 static struct kc_boot_data *k_boot_data;
 
 static void *object_space_base;
@@ -232,7 +236,7 @@ static void collect_video_data(void)
 
 static void collect_acpi_data(void)
 {
-    EFI_GUID acpi2_guid = ACPI_20_TABLE_GUID;
+    EFI_GUID acpi2_guid = EFI_ACPI_20_TABLE_GUID;
     EFI_GUID acpi_guid = ACPI_TABLE_GUID;
 
     UINTN config_table_count = 
