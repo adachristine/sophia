@@ -11,6 +11,9 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 
+static const size_t INTERRUPT_STACK_SIZE = 4096;
+static const size_t THREAD_SIZE = 16834;
+
 extern uint64_t *get_tss_rsp0(void);
 
 static void lock_scheduler(void);
@@ -61,6 +64,13 @@ static void idle_thread_entry(void)
     }
 }
 
+static void create_interrupt_stack(size_t size)
+{
+    char *rsp0 = vm_alloc(size, VM_ALLOC_ANY);
+    memset(rsp0, 0, size);
+    *get_tss_rsp0() = (uintptr_t)rsp0 + size;
+}
+
 noreturn void task_init(void)
 {
     lock_scheduler();
@@ -73,9 +83,7 @@ noreturn void task_init(void)
 
     // XXX: unfuck this mess at some point
     // XXX: make this also not demand-allocated or it's gonna fail
-    char *kernel_rsp0 = vm_alloc(4096, VM_ALLOC_ANY);
-    kernel_rsp0[1] = 0;
-    *get_tss_rsp0() = (uintptr_t)kernel_rsp0 + 4096;
+    create_interrupt_stack(INTERRUPT_STACK_SIZE);
 
     // initalize static threads
     idle_thread = create_thread(idle_thread_entry);

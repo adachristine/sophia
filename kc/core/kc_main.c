@@ -22,7 +22,6 @@ static struct kc_boot_data *boot_data;
 unsigned long kc_main(struct kc_boot_data *data)
 {
     boot_data = data;
-
     cpu_init();
     serial_init();
     kprintf("sophia starting, boot data %#lx\n", boot_data);
