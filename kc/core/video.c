@@ -148,6 +148,8 @@ static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x8f, 0xf1, 0x60, 0x00, 0x00, 0x00} 
 };
 
+static const char ascii_test[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
 struct video_color
 {
     uint8_t red;
@@ -188,6 +190,7 @@ static struct video_bitmap framebuffer_bitmap;
 static struct console_state console_state;
 
 int pixel_put(struct video_color color, int xpos, int ypos);
+int character_put(int c);
 
 int video_init(void)
 {
@@ -220,6 +223,8 @@ int video_init(void)
         }
     }
 
+    character_put('A');
+
     return 0;
 }
 
@@ -228,6 +233,21 @@ int pixel_put(struct video_color color, int xpos, int ypos)
     int byte_offset = ypos * framebuffer_bitmap.pitch + xpos * framebuffer_bitmap.bpp;
     struct video_pixel_bgra32 *video_pixel = (struct video_pixel_bgra32 *)(((char *)framebuffer_bitmap.buffer) + byte_offset);
     *video_pixel = (struct video_pixel_bgra32){color.blue, color.green, color.red, 0};
+
+    return 0;
+}
+
+int character_put(int c)
+{
+    for (int i = 0; i < FONT_HEIGHT; i++)
+    {
+        for (int j = 0; j < FONT_WIDTH; j++)
+        {
+            pixel_put(ascii_characters[c - 32][i] & (1 << j) ? console_state.foreground : console_state.background, FONT_WIDTH - j, FONT_HEIGHT - i);
+        }
+    }
+
+    console_state.cursor_column++;
 
     return 0;
 }
