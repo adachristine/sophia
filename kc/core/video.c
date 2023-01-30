@@ -49,6 +49,8 @@
 
 static const int FONT_WIDTH = 8;
 static const int FONT_HEIGHT = 13;
+static const int CELL_WIDTH = 9;
+static const int CELL_HEIGHT = 14;
 
 static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, 
@@ -223,7 +225,10 @@ int video_init(void)
         }
     }
 
-    character_put('A');
+    for (size_t i = 0; i < sizeof(ascii_test); i++)
+    { 
+        character_put(ascii_test[i]);
+    }
 
     return 0;
 }
@@ -243,7 +248,9 @@ int character_put(int c)
     {
         for (int j = 0; j < FONT_WIDTH; j++)
         {
-            pixel_put(ascii_characters[c - 32][i] & (1 << j) ? console_state.foreground : console_state.background, FONT_WIDTH - j, FONT_HEIGHT - i);
+            int top = console_state.cursor_line * CELL_HEIGHT;
+            int left = console_state.cursor_column * CELL_WIDTH;
+            pixel_put(ascii_characters[c - 32][i] & (1 << j) ? console_state.foreground : console_state.background, left + FONT_WIDTH - j, top + FONT_HEIGHT - i);
         }
     }
 
