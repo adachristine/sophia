@@ -30,9 +30,9 @@
 
 #include "vm_tree.h"
 #include "panic.h"
-#include "kprint.h"
 
-#include <sophialib.h>
+#include <lib/kstdio.h>
+#include <lib/kstring.h>
 
 #define assert(expr)
 

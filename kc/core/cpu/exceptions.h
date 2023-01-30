@@ -21,7 +21,7 @@
 
 #ifndef __ASSEMBLER__
 
-#include "kprint.h"
+#include <lib/kstdio.h>
 
 struct isr_context_param_regs
 {

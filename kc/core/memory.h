@@ -4,7 +4,7 @@
 #include <kernel/memory/paging.h>
 #include <kernel/memory/range.h>
 
-#include <sophialib.h>
+#include <lib/kstring.h>
 
 #include <core/memory.h>
 

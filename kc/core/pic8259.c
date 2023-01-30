@@ -1,9 +1,10 @@
 #include "pic8259.h"
 #include "cpu.h"
 #include "port.h"
-#include "kprint.h"
 
 #include <stdbool.h>
+
+#include <lib/kstdio.h>
 
 #define ICW1_ICW4 0x1
 #define ICW1_SINGLE 0x2

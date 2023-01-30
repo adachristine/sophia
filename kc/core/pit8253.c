@@ -1,10 +1,11 @@
 #include "pit8253.h"
 #include "pic8259.h"
 #include "port.h"
-#include "kprint.h"
 #include "memory.h"
 
 #include <stdatomic.h>
+
+#include <lib/kstdio.h>
 
 #define PIT8253_DATA0 0x40
 #define PIT8253_CMD 0x43

@@ -1,6 +1,7 @@
 #include "page_early.h"
-#include "kprint.h"
 #include "panic.h"
+
+#include <lib/kstdio.h>
 
 static struct page_early_state
 {

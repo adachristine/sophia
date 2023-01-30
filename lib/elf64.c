@@ -1,4 +1,5 @@
-#include "elf.h"
+#include <stdbool.h>
+#include <lib/elf.h>
 
 bool elf64_validate(Elf64_Ehdr *ehdr, unsigned type, unsigned machine)
 {

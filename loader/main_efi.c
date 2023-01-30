@@ -5,8 +5,9 @@
 #include <efi/types.h>
 #include <efi/error.h>
 
-#include "elf.h"
-#include "kstdio.h"
+#include <lib/elf.h>
+#include <lib/kstdio.h>
+#include <lib/kstring.h>
 
 FILE *kstdout;
 FILE *kstderr;

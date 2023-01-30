@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sophialib.h>
+#include <lib/kstring.h>
 
 #include <stdarg.h>
 

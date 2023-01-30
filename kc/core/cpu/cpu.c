@@ -1,6 +1,5 @@
 #include "cpu.h"
 #include "exceptions.h"
-#include "kprint.h"
 #include "panic.h"
 #include "msr.h"
 #include "task.h"
@@ -9,6 +8,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
+#include <lib/kstdio.h>
 
 #define GDT_ENTRIES 16
 #define IDT_ENTRIES 256

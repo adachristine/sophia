@@ -1,5 +1,6 @@
 #include "panic.h"
-#include "kprint.h"
+
+#include <lib/kstdio.h>
 
 #include <stdbool.h>
 

@@ -11,7 +11,6 @@
 #include "page_stack.h"
 
 #include "memory.h"
-#include "kprint.h"
 #include "panic.h"
 #include "vm_object.h"
 #include "cpu/mmu.h"
@@ -21,6 +20,7 @@
 
 #include <kc.h>
 #include <core/memory.h>
+#include <lib/kstdio.h>
 
 #define align_next(x, a) (x + a - 1) & ~(a - 1)
 

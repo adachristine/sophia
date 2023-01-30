@@ -7,11 +7,11 @@
 #include <loader/efi/shim.h>
 #include <kernel/entry.h>
 #include <kernel/memory/range.h>
-#include <sophialib.h>
 
 #include <stdbool.h>
 
-#include "../lib/elf.h"
+#include <lib/kstring.h>
+#include <lib/elf.h>
 
 #define KERNEL_IMAGE_BASE 0xffffffff80000000
 #define OBJECT_SPACE_SIZE 131072

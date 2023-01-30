@@ -1,6 +1,5 @@
 #include "cpu.h"
 #include "serial.h"
-#include "kprint.h"
 #include "memory.h"
 #include "panic.h"
 #include "task.h"
@@ -9,6 +8,7 @@
 #include "cpu/irq.h"
 
 #include <kernel/entry.h>
+#include <lib/kstdio.h>
 
 #include <stdbool.h>
 #include <stddef.h>

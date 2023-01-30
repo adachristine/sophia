@@ -1,4 +1,4 @@
-#include <sophialib.h>
+#include <lib/kstring.h>
 
 size_t strlen(const char *s)
 {

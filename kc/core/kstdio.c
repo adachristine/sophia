@@ -1,10 +1,10 @@
-#include "kprint.h"
 #include "serial.h"
-
-#include <sophialib.h>
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#include <lib/kstdio.h>
+#include <lib/kstring.h>
 
 FILE *kstdout;
 

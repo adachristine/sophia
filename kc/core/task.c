@@ -3,13 +3,15 @@
 #include "memory.h"
 #include "panic.h"
 #include "cpu.h"
-#include "kprint.h"
 #include "cpu/irq.h"
 #include "cpu/mmu.h"
 #include "pit8253.h"
 
 #include <stdatomic.h>
 #include <stdbool.h>
+
+#include <lib/elf.h>
+#include <lib/kstdio.h>
 
 static const size_t INTERRUPT_STACK_SIZE = 4096;
 static const size_t THREAD_SIZE = 16834;
