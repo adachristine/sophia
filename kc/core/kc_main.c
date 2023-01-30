@@ -6,6 +6,7 @@
 #include "pic8259.h"
 #include "pit8253.h"
 #include "cpu/irq.h"
+#include "video.h"
 
 #include <kernel/entry.h>
 #include <lib/kstdio.h>
@@ -29,6 +30,7 @@ unsigned long kc_main(struct kc_boot_data *data)
     pic8259_init();
     pit8253_timer_source.init();
     pit8253_timer_source.set_frequency(1);
+    video_init();
     task_init();
 
     return 0;
