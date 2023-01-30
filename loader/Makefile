@@ -16,7 +16,7 @@ LDFLAGS := --target=$(GNUEFIARCH)-unknown-windows -nostdlib -ggdb \
 
 all: $(IMAGE)
 
-OBJS := main_efi.o elf64.o memcmp.o memmove.o kprintf.o strtoull.o memset.o \
+OBJS := main_efi.o elf64.o memcmp.o memmove.o kprintf.o string.o memset.o \
 	memcpy.o
 DEPS := $(OBJS:.o=.d)
 
