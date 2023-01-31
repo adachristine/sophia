@@ -1,4 +1,5 @@
 #include "serial.h"
+#include "video.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -11,6 +12,7 @@ FILE *kstdout;
 int kfputc(int c, FILE *f)
 {
     (void)f;
+    video_putchar(c);
     return serial_putchar(c);
 }
 

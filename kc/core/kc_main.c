@@ -25,12 +25,12 @@ unsigned long kc_main(struct kc_boot_data *data)
     boot_data = data;
     cpu_init();
     serial_init();
+    video_init();
     kprintf("sophia starting, boot data %#lx\n", boot_data);
     memory_init();
     pic8259_init();
     pit8253_timer_source.init();
     pit8253_timer_source.set_frequency(1);
-    video_init();
     task_init();
 
     return 0;

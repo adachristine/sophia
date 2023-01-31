@@ -52,6 +52,8 @@ static const int FONT_HEIGHT = 13;
 static const int CELL_WIDTH = 9;
 static const int CELL_HEIGHT = 14;
 
+static const int CHARACTER_OFFSET = 32;
+
 static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, 
 {0x00, 0x00, 0x18, 0x18, 0x00, 0x00, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18}, 
@@ -150,8 +152,6 @@ static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x8f, 0xf1, 0x60, 0x00, 0x00, 0x00} 
 };
 
-static const char ascii_test[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
 struct video_color
 {
     uint8_t red;
@@ -191,8 +191,8 @@ struct console_state
 static struct video_bitmap framebuffer_bitmap;
 static struct console_state console_state;
 
-int pixel_put(struct video_color color, int xpos, int ypos);
-int character_put(int c);
+static int pixel_put(struct video_color color, int xpos, int ypos);
+static int character_draw(int c);
 
 int video_init(void)
 {
@@ -200,22 +200,25 @@ int video_init(void)
 
     char *video_format_name = (boot_data->format == RGBA32BPP_VIDEO_FORMAT) ? "RGB" : "BGR";
 
-    framebuffer_bitmap.format = boot_data->format;
-    framebuffer_bitmap.width = boot_data->width;
-    framebuffer_bitmap.height = boot_data->height;
-    framebuffer_bitmap.pitch = boot_data->pitch;
-    framebuffer_bitmap.bpp = 4;
-    framebuffer_bitmap.buffer = (void *)boot_data->framebuffer.base;
-    
-    console_state.foreground = (struct video_color){0xff, 0xff, 0xff, 0x0};
-    console_state.background = (struct video_color){0x00, 0x00, 0xff, 0x0};
-    console_state.columns = framebuffer_bitmap.width / FONT_WIDTH;
-    console_state.lines = framebuffer_bitmap.height / FONT_HEIGHT;
-    console_state.cursor_line = 0;
-    console_state.cursor_column = 0;
+    framebuffer_bitmap = (struct video_bitmap)
+    {
+        boot_data->format,
+        boot_data->height,
+        boot_data->width,
+        4,
+        boot_data->pitch,
+        (void *)boot_data->framebuffer.base
+    };
 
-    kprintf("video output %ix%i pixels, %i bytes per line, %s 32 bytes per pixel\n",
-            boot_data->width, boot_data->height, boot_data->pitch, video_format_name);
+    console_state = (struct console_state)
+    {
+        {0xff, 0xff, 0xff, 0x00},
+        {0x00, 0x00, 0xff, 0x00},
+        framebuffer_bitmap.height / CELL_HEIGHT,
+        framebuffer_bitmap.width / CELL_WIDTH,
+        0,
+        0
+    };
 
     for (size_t i = 0; i < framebuffer_bitmap.height; i++)
     {
@@ -225,15 +228,14 @@ int video_init(void)
         }
     }
 
-    for (size_t i = 0; i < sizeof(ascii_test); i++)
-    { 
-        character_put(ascii_test[i]);
-    }
+    kprintf("video output %ix%i pixels, %i bytes per line, %s 32 bytes per pixel\n",
+            boot_data->width, boot_data->height, boot_data->pitch, video_format_name);
+
 
     return 0;
 }
 
-int pixel_put(struct video_color color, int xpos, int ypos)
+static int pixel_put(struct video_color color, int xpos, int ypos)
 {
     int byte_offset = ypos * framebuffer_bitmap.pitch + xpos * framebuffer_bitmap.bpp;
     struct video_pixel_bgra32 *video_pixel = (struct video_pixel_bgra32 *)(((char *)framebuffer_bitmap.buffer) + byte_offset);
@@ -242,7 +244,34 @@ int pixel_put(struct video_color color, int xpos, int ypos)
     return 0;
 }
 
-int character_put(int c)
+static void console_feed_line()
+{
+    console_state.cursor_line++;
+    console_state.cursor_column = 0;
+}
+
+int video_putchar(int c)
+{
+    if (c >= CHARACTER_OFFSET)
+    {
+        character_draw(c);
+        console_state.cursor_column++;
+    }
+
+    else if (c == '\n')
+    {
+        console_feed_line();
+    }
+
+    if (console_state.cursor_column == console_state.columns && console_state.cursor_line < console_state.lines)
+    {
+        console_feed_line();
+    }
+
+    return 0;
+}
+
+int character_draw(int c)
 {
     for (int i = 0; i < FONT_HEIGHT; i++)
     {
@@ -250,11 +279,11 @@ int character_put(int c)
         {
             int top = console_state.cursor_line * CELL_HEIGHT;
             int left = console_state.cursor_column * CELL_WIDTH;
-            pixel_put(ascii_characters[c - 32][i] & (1 << j) ? console_state.foreground : console_state.background, left + FONT_WIDTH - j, top + FONT_HEIGHT - i);
+            pixel_put(ascii_characters[c - CHARACTER_OFFSET][i] & (1 << j) ? console_state.foreground : console_state.background,
+                    left + FONT_WIDTH - j,
+                    top + FONT_HEIGHT - i);
         }
     }
-
-    console_state.cursor_column++;
 
     return 0;
 }
