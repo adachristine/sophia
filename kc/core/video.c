@@ -152,6 +152,24 @@ static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x8f, 0xf1, 0x60, 0x00, 0x00, 0x00} 
 };
 
+struct video_point
+{
+    int32_t x;
+    int32_t y;
+};
+
+struct video_dimensions
+{
+    int32_t width;
+    int32_t height;
+};
+
+struct video_rectangle
+{
+    struct video_point pos;
+    struct video_dimensions size;
+};
+
 struct video_color
 {
     uint8_t red;
@@ -191,6 +209,7 @@ struct console_state
 static struct video_bitmap framebuffer_bitmap;
 static struct console_state console_state;
 
+static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos);
 static int pixel_put(struct video_color color, int xpos, int ypos);
 static int character_draw(int c);
 
@@ -237,11 +256,17 @@ int video_init(void)
 
 static int pixel_put(struct video_color color, int xpos, int ypos)
 {
-    int byte_offset = ypos * framebuffer_bitmap.pitch + xpos * framebuffer_bitmap.bpp;
-    struct video_pixel_bgra32 *video_pixel = (struct video_pixel_bgra32 *)(((char *)framebuffer_bitmap.buffer) + byte_offset);
-    *video_pixel = (struct video_pixel_bgra32){color.blue, color.green, color.red, 0};
+    struct video_point pos = {xpos, ypos};
+    struct video_pixel_bgra32 *pixel = (struct video_pixel_bgra32 *)pixel_addr(&framebuffer_bitmap, pos);
+    *pixel = (struct video_pixel_bgra32){color.blue, color.green, color.red, 0};
 
     return 0;
+}
+
+static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos)
+{
+    int32_t offset = pos.y * bitmap->pitch + pos.x * bitmap->bpp;
+    return offset + (char *)framebuffer_bitmap.buffer;
 }
 
 static void console_feed_line()
