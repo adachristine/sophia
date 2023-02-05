@@ -11,7 +11,7 @@ OBJCOPY := objcopy
 
 CFLAGS += -ffreestanding -mno-red-zone -ggdb -std=c2x \
           -Wall -Wextra -Werror -fno-stack-protector \
-	  -Wpedantic
+	  	  -Wpedantic -std=c2x
 
 CXXFLAGS += -ffreestanding -mno-red-zone -ggdb \
 	    -Wall -Wextra -Werror -fno-stack-protector
