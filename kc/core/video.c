@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <lib/kstring.h>
 #include <lib/kstdio.h>
+#include <lib/numeric.h>
 
 #include <kernel/entry.h>
 /*
@@ -305,11 +306,6 @@ int video_putchar(int c)
     return 0;
 }
 
-static size_t min_sz(size_t left, size_t right)
-{
-    return (left < right) ? left : right;
-}
-
 static void bitmap_copy(struct video_bitmap *dest, struct video_bitmap *src, struct video_point dest_pos, struct video_rect src_rect)
 {
     void * (*copy_func)(void *, const void *, size_t) = memcpy;
@@ -335,7 +331,7 @@ static void bitmap_copy(struct video_bitmap *dest, struct video_bitmap *src, str
         void *dest_addr = pixel_addr(dest, line_pos);
         void *src_addr = pixel_addr(src, src_line_pos);
 
-        copy_func(dest_addr, src_addr, min_sz(dest_stride, src_stride));
+        copy_func(dest_addr, src_addr, min(dest_stride, src_stride));
     }
 }
 
