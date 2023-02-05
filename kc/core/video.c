@@ -47,12 +47,12 @@
  * OpenGL(TM) is a trademark of Silicon Graphics, Inc.
  */
 
-static const int FONT_WIDTH = 8;
-static const int FONT_HEIGHT = 13;
-static const int CELL_WIDTH = 9;
-static const int CELL_HEIGHT = 14;
+#define FONT_WIDTH 8
+#define FONT_HEIGHT 13
+#define CELL_WIDTH 9
+#define CELL_HEIGHT 14
 
-static const int CHARACTER_OFFSET = 32;
+#define CHARACTER_OFFSET 32
 
 static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, 
@@ -164,7 +164,7 @@ struct video_dimensions
     int32_t height;
 };
 
-struct video_rectangle
+struct video_rect
 {
     struct video_point pos;
     struct video_dimensions size;
@@ -210,6 +210,7 @@ static struct video_bitmap framebuffer_bitmap;
 static struct console_state console_state;
 
 static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos);
+static void pixel_set(struct video_bitmap *bitmap, struct video_point pos, struct video_color color);
 static int pixel_put(struct video_color color, int xpos, int ypos);
 static int character_draw(int c);
 
@@ -266,7 +267,15 @@ static int pixel_put(struct video_color color, int xpos, int ypos)
 static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos)
 {
     int32_t offset = pos.y * bitmap->pitch + pos.x * bitmap->bpp;
-    return offset + (char *)framebuffer_bitmap.buffer;
+    return offset + (char *)bitmap->buffer;
+}
+
+static void pixel_set(struct video_bitmap *bitmap, struct video_point pos, struct video_color color)
+{
+    struct video_pixel_bgra32 *pixel = pixel_addr(bitmap, pos);
+    pixel->red = color.red;
+    pixel->green = color.green;
+    pixel->blue = color.blue;
 }
 
 static void console_feed_line()
@@ -296,20 +305,78 @@ int video_putchar(int c)
     return 0;
 }
 
+static size_t min_sz(size_t left, size_t right)
+{
+    return (left < right) ? left : right;
+}
+
+static void bitmap_copy(struct video_bitmap *dest, struct video_bitmap *src, struct video_point dest_pos, struct video_rect src_rect)
+{
+    void * (*copy_func)(void *, const void *, size_t) = memcpy;
+
+    if (dest == src)
+    {
+        copy_func = memmove;
+    }
+
+    for (int i = 0; i < src_rect.size.height; i++)
+    {
+        struct video_point line_pos = {dest_pos.x, dest_pos.y + i};
+        struct video_point src_line_pos = {src_rect.pos.x, src_rect.pos.y + i};
+
+        if ((unsigned)(dest_pos.y + i) > dest->height)
+        {
+            break;
+        }
+
+        size_t dest_stride = (dest->width - dest_pos.x) * dest->bpp;
+        size_t src_stride = (src_rect.size.width - src_rect.pos.x) * src->bpp;
+
+        void *dest_addr = pixel_addr(dest, line_pos);
+        void *src_addr = pixel_addr(src, src_line_pos);
+
+        copy_func(dest_addr, src_addr, min_sz(dest_stride, src_stride));
+    }
+}
+
+static struct video_color glyph_pixel(int c, struct video_point pos, struct video_color foreground, struct video_color background)
+{
+    int index = c - CHARACTER_OFFSET;
+    return ascii_characters[index][FONT_HEIGHT - 1 - pos.y] & (1 << (FONT_WIDTH - 1 - pos.x)) ? foreground : background;
+}
+
 int character_draw(int c)
 {
-    for (int i = 0; i < FONT_HEIGHT; i++)
+    struct video_pixel_bgra32 buffer[FONT_HEIGHT][FONT_WIDTH] = {{0}};
+    struct video_bitmap glyph = 
     {
-        for (int j = 0; j < FONT_WIDTH; j++)
+        framebuffer_bitmap.format,
+        FONT_HEIGHT,
+        FONT_WIDTH,
+        framebuffer_bitmap.bpp,
+        FONT_WIDTH * framebuffer_bitmap.bpp,
+        buffer
+    };
+    
+    struct video_rect glyph_rect = { { 0, 0 }, { glyph.width, glyph.height } };
+
+    struct video_point glyph_pos = {0};
+    struct video_point framebuffer_pos = 
+    {
+        console_state.cursor_column * CELL_WIDTH,
+        console_state.cursor_line * CELL_HEIGHT
+    };
+
+    (void)c;
+    for (glyph_pos.y = 0; glyph_pos.y < FONT_HEIGHT; glyph_pos.y++)
+    {
+        for (glyph_pos.x = 0; glyph_pos.x < FONT_WIDTH; glyph_pos.x++)
         {
-            int top = console_state.cursor_line * CELL_HEIGHT;
-            int left = console_state.cursor_column * CELL_WIDTH;
-            pixel_put(ascii_characters[c - CHARACTER_OFFSET][i] & (1 << j) ? console_state.foreground : console_state.background,
-                    left + FONT_WIDTH - j,
-                    top + FONT_HEIGHT - i);
+             pixel_set(&glyph, glyph_pos, glyph_pixel(c, glyph_pos, console_state.foreground, console_state.background));
         }
     }
 
+    bitmap_copy(&framebuffer_bitmap, &glyph, framebuffer_pos, glyph_rect);
     return 0;
 }
 
