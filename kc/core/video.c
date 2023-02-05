@@ -1,4 +1,5 @@
-#include <stdint.h>
+#include "video.h"
+
 #include <lib/kstring.h>
 #include <lib/kstdio.h>
 #include <lib/numeric.h>
@@ -153,32 +154,6 @@ static const unsigned char ascii_characters[][13] = {
 {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x8f, 0xf1, 0x60, 0x00, 0x00, 0x00} 
 };
 
-struct video_point
-{
-    int32_t x;
-    int32_t y;
-};
-
-struct video_dimensions
-{
-    int32_t width;
-    int32_t height;
-};
-
-struct video_rect
-{
-    struct video_point pos;
-    struct video_dimensions size;
-};
-
-struct video_color
-{
-    uint8_t red;
-    uint8_t green;
-    uint8_t blue;
-    uint8_t alpha;
-};
-
 struct video_pixel_bgra32
 {
     uint8_t blue;
@@ -190,8 +165,7 @@ struct video_pixel_bgra32
 struct video_bitmap
 {
     enum video_pixel_format format;
-    size_t height;
-    size_t width;
+    struct video_size size;
     size_t bpp;
     size_t pitch;
     void *buffer;
@@ -224,9 +198,8 @@ int video_init(void)
     framebuffer_bitmap = (struct video_bitmap)
     {
         boot_data->format,
-        boot_data->height,
-        boot_data->width,
-        4,
+        { boot_data->width, boot_data->height },
+        sizeof(struct video_pixel_bgra32),
         boot_data->pitch,
         (void *)boot_data->framebuffer.base
     };
@@ -235,15 +208,15 @@ int video_init(void)
     {
         {0xff, 0xff, 0xff, 0x00},
         {0x00, 0x00, 0xff, 0x00},
-        framebuffer_bitmap.height / CELL_HEIGHT,
-        framebuffer_bitmap.width / CELL_WIDTH,
+        framebuffer_bitmap.size.height / CELL_HEIGHT,
+        framebuffer_bitmap.size.width / CELL_WIDTH,
         0,
         0
     };
 
-    for (size_t i = 0; i < framebuffer_bitmap.height; i++)
+    for (int32_t i = 0; i < framebuffer_bitmap.size.height; i++)
     {
-        for (size_t j = 0; j < framebuffer_bitmap.width; j++)
+        for (int32_t j = 0; j < framebuffer_bitmap.size.width; j++)
         {
             pixel_put(console_state.background, j, i);
         }
@@ -267,6 +240,11 @@ static int pixel_put(struct video_color color, int xpos, int ypos)
 
 static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos)
 {
+    if (pos.x > bitmap->size.width || pos.y > bitmap->size.height)
+    {
+        return NULL;
+    }
+
     int32_t offset = pos.y * bitmap->pitch + pos.x * bitmap->bpp;
     return offset + (char *)bitmap->buffer;
 }
@@ -292,10 +270,14 @@ int video_putchar(int c)
         character_draw(c);
         console_state.cursor_column++;
     }
-
     else if (c == '\n')
     {
         console_feed_line();
+    }
+    else
+    {
+        character_draw('?');
+        console_state.cursor_column++;
     }
 
     if (console_state.cursor_column == console_state.columns && console_state.cursor_line < console_state.lines)
@@ -320,12 +302,12 @@ static void bitmap_copy(struct video_bitmap *dest, struct video_bitmap *src, str
         struct video_point line_pos = {dest_pos.x, dest_pos.y + i};
         struct video_point src_line_pos = {src_rect.pos.x, src_rect.pos.y + i};
 
-        if ((unsigned)(dest_pos.y + i) > dest->height)
+        if ((dest_pos.y + i) > dest->size.height)
         {
             break;
         }
 
-        size_t dest_stride = (dest->width - dest_pos.x) * dest->bpp;
+        size_t dest_stride = (dest->size.width - dest_pos.x) * dest->bpp;
         size_t src_stride = (src_rect.size.width - src_rect.pos.x) * src->bpp;
 
         void *dest_addr = pixel_addr(dest, line_pos);
@@ -347,14 +329,13 @@ int character_draw(int c)
     struct video_bitmap glyph = 
     {
         framebuffer_bitmap.format,
-        FONT_HEIGHT,
-        FONT_WIDTH,
+        { FONT_WIDTH, FONT_HEIGHT },
         framebuffer_bitmap.bpp,
         FONT_WIDTH * framebuffer_bitmap.bpp,
         buffer
     };
     
-    struct video_rect glyph_rect = { { 0, 0 }, { glyph.width, glyph.height } };
+    struct video_rect glyph_rect = { { 0, 0 }, { glyph.size.width, glyph.size.height } };
 
     struct video_point glyph_pos = {0};
     struct video_point framebuffer_pos = 
