@@ -1,12 +1,4 @@
-#include "video.h"
-
-#include <lib/kstring.h>
-#include <lib/kstdio.h>
-#include <lib/numeric.h>
-
-#include <kernel/entry.h>
 /*
-
  * Author's Notice:
  *
  * This file contains a bitmap font copied from:
@@ -47,7 +39,18 @@
  * Inc., 2011 N.  Shoreline Blvd., Mountain View, CA 94039-7311.
  *
  * OpenGL(TM) is a trademark of Silicon Graphics, Inc.
+ *
  */
+
+#include "video.h"
+
+#include <stdbool.h>
+
+#include <lib/kstring.h>
+#include <lib/kstdio.h>
+#include <lib/numeric.h>
+
+#include <kernel/entry.h>
 
 #define FONT_WIDTH 8
 #define FONT_HEIGHT 13
@@ -184,10 +187,12 @@ struct console_state
 static struct video_bitmap framebuffer_bitmap;
 static struct console_state console_state;
 
-static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos);
-static void pixel_set(struct video_bitmap *bitmap, struct video_point pos, struct video_color color);
+static inline void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos);
+static inline void pixel_set(struct video_bitmap *bitmap, struct video_point pos, struct video_color color);
 static int pixel_put(struct video_color color, int xpos, int ypos);
 static int character_draw(int c);
+static void bitmap_copy(struct video_bitmap *dest, struct video_bitmap *src, struct video_point dest_pos, struct video_rect src_rect);
+static void bitmap_fill(struct video_bitmap *bitmap, struct video_color color, struct video_rect fill_rect);
 
 int video_init(void)
 {
@@ -249,7 +254,7 @@ static void *pixel_addr(struct video_bitmap *bitmap, struct video_point pos)
     return offset + (char *)bitmap->buffer;
 }
 
-static void pixel_set(struct video_bitmap *bitmap, struct video_point pos, struct video_color color)
+static inline void pixel_set(struct video_bitmap *bitmap, struct video_point pos, struct video_color color)
 {
     struct video_pixel_bgra32 *pixel = pixel_addr(bitmap, pos);
     pixel->red = color.red;
@@ -261,6 +266,38 @@ static void console_feed_line()
 {
     console_state.cursor_line++;
     console_state.cursor_column = 0;
+
+    if (console_state.cursor_line < console_state.lines)
+    {
+        return;
+    }
+    
+    console_state.cursor_line = console_state.lines - 1;
+    struct video_point dest_pos = { 0, 0 };
+    struct video_rect src_rect =
+    {
+        {
+            0, 
+            CELL_HEIGHT 
+        }, 
+        {
+            framebuffer_bitmap.size.width,
+            framebuffer_bitmap.size.height - CELL_HEIGHT
+        }
+    };
+    bitmap_copy(&framebuffer_bitmap, &framebuffer_bitmap, dest_pos, src_rect);
+    struct video_rect fill_rect = { {0, framebuffer_bitmap.size.height - CELL_HEIGHT }, {framebuffer_bitmap.size.width, CELL_HEIGHT} };
+    bitmap_fill(&framebuffer_bitmap, console_state.background, fill_rect);
+}
+
+static void check_append_character()
+{
+    console_state.cursor_column++;
+
+    if (console_state.cursor_column >= console_state.columns)
+    {
+        console_feed_line();
+    }
 }
 
 int video_putchar(int c)
@@ -268,19 +305,9 @@ int video_putchar(int c)
     if (c >= CHARACTER_OFFSET)
     {
         character_draw(c);
-        console_state.cursor_column++;
+        check_append_character();
     }
     else if (c == '\n')
-    {
-        console_feed_line();
-    }
-    else
-    {
-        character_draw('?');
-        console_state.cursor_column++;
-    }
-
-    if (console_state.cursor_column == console_state.columns && console_state.cursor_line < console_state.lines)
     {
         console_feed_line();
     }
@@ -314,6 +341,22 @@ static void bitmap_copy(struct video_bitmap *dest, struct video_bitmap *src, str
         void *src_addr = pixel_addr(src, src_line_pos);
 
         copy_func(dest_addr, src_addr, min(dest_stride, src_stride));
+    }
+}
+
+static void bitmap_fill(struct video_bitmap *bitmap, struct video_color color, struct video_rect fill_rect)
+{
+    int max_x = min(fill_rect.pos.x + fill_rect.size.width, bitmap->size.width);
+    int max_y = min(fill_rect.pos.y + fill_rect.size.height, bitmap->size.height);
+
+    struct video_point pos;
+
+    for (pos.y = fill_rect.pos.y; pos.y < max_y; pos.y++)
+    {
+        for (pos.x = fill_rect.pos.x; pos.x < max_x; pos.x++)
+        {
+            pixel_set(bitmap, pos, color);
+        }
     }
 }
 
