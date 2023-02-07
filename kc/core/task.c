@@ -15,6 +15,7 @@
 
 static const size_t INTERRUPT_STACK_SIZE = 4096;
 static const size_t THREAD_SIZE = 16834;
+static const enum vm_alloc_flags ALLOC_FLAGS = VM_ALLOC_ANY|VM_ALLOC_ANONYMOUS;
 
 extern uint64_t *get_tss_rsp0(void);
 
@@ -62,13 +63,25 @@ static void idle_thread_entry(void)
 
     while (true)
     {
-        __asm__ volatile ("hlt;");
+        __asm__ ("hlt;");
+    }
+}
+
+static void sleepy_thread_entry(void)
+{
+    int thread_slept_count = 0;
+
+    while (true)
+    {
+        sleep_thread(1000000000);
+        thread_slept_count++;
+        kprintf("thread slept for approximately %d seconds (just 1 more second please)\n", thread_slept_count);
     }
 }
 
 static void create_interrupt_stack(size_t size)
 {
-    char *rsp0 = vm_alloc(size, VM_ALLOC_ANY);
+    char *rsp0 = vm_alloc(size, ALLOC_FLAGS);
     memset(rsp0, 0, size);
     *get_tss_rsp0() = (uintptr_t)rsp0 + size;
 }
@@ -89,8 +102,10 @@ noreturn void task_init(void)
 
     // initalize static threads
     idle_thread = create_thread(idle_thread_entry);
+    struct kc_thread *sleepy_thread = create_thread(sleepy_thread_entry);
 
     current_thread = idle_thread;
+    ready_thread_push_back(sleepy_thread);
 
     idle_thread->status = RUNNING;
     cpu_set_thread(&idle_thread->state, NULL, get_tss_rsp0());
@@ -179,7 +194,7 @@ void update_time(void)
 
 static struct kc_thread *create_thread(void (*thread_f)(void))
 {
-    char *task_bottom = vm_alloc(16384, VM_ALLOC_ANY);
+    char *task_bottom = vm_alloc(16384, ALLOC_FLAGS);
     struct kc_thread *thread =
         (struct kc_thread *)(task_bottom + 16384 - sizeof(*thread));
 
