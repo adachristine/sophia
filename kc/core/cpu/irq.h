@@ -19,9 +19,9 @@ void irq_unlock(void);
 .macro IRQ_DEFINE name:req handler:req, irq:req
 \name\()_irq\()\irq\()_isr:
     ISR_STORE_PARAM_REGS
-    movb \irq, %dil
     ISR_STORE_CALLER_REGS
     ISR_STORE_CALLEE_REGS
+    mov $\irq, %di
     ISR_CALL \handler
     ISR_RESTORE_CALLEE_REGS
     ISR_RESTORE_CALLER_REGS
