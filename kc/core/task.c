@@ -6,6 +6,7 @@
 #include "cpu/irq.h"
 #include "cpu/mmu.h"
 #include "pit8253.h"
+#include "port.h"
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -67,6 +68,27 @@ static void idle_thread_entry(void)
     }
 }
 
+#define PS2INPUT 0x60
+#define PS2STATUS 0x64
+#define PS2STATUS_IBF 0x1
+
+static void keyboard_input_loop(void)
+{
+    bool has_bytes = true;
+    while (has_bytes)
+    {
+        has_bytes = inb(PS2STATUS) & PS2STATUS_IBF;
+        if (has_bytes)
+        {
+            kprintf("read byte from keyboard input: %hhd\n", inb(PS2INPUT));
+        }
+        else
+        {
+            kprintf("no bytes in keyboard input\n");
+        }
+    }
+}
+
 static void sleepy_thread_entry(void)
 {
     int thread_slept_count = 0;
@@ -75,8 +97,10 @@ static void sleepy_thread_entry(void)
     {
         sleep_thread(1000000000);
         thread_slept_count++;
-        kprintf("thread slept for approximately %d seconds (just 1 more second please)\n", thread_slept_count);
+        //keyboard_input_loop();
     }
+
+    (void)thread_slept_count;
 }
 
 static void create_interrupt_stack(size_t size)
@@ -304,8 +328,8 @@ static void sleep_thread_until(uint64_t nanoseconds)
         return;
     }
 
-    kprintf("time elapsed is now %ld\r\n", timesource->nanoseconds_elapsed());
-    kprintf("thread will now sleep until %ld\r\n", nanoseconds);
+//    kprintf("time elapsed is now %ld\r\n", timesource->nanoseconds_elapsed());
+//    kprintf("thread will now sleep until %ld\r\n", nanoseconds);
     current_thread->sleep_expiration = nanoseconds;
     current_thread->next = sleeping_threads;
     sleeping_threads = current_thread;
@@ -370,7 +394,7 @@ static int sleeping_thread_callback(uint64_t nanoseconds)
 
         if (this_thread->sleep_expiration <= nanoseconds)
         {
-            kprintf("thread awakened: %p\n", this_thread);
+            //kprintf("thread awakened: %p\n", this_thread);
             this_thread->sleep_expiration = 0;
             unblock_thread(this_thread);
         }
