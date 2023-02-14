@@ -4,8 +4,10 @@
 
 #ifndef __ASSEMBLER__
 
-void irq_lock(void);
-void irq_unlock(void);
+#include <stdint.h>
+
+uint64_t irq_lock(void);
+void irq_unlock(uint64_t flags);
 
 #else
 

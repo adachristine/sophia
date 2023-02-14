@@ -5,9 +5,9 @@
 
 void mmu_set_map(phys_addr_t map)
 {
-    irq_lock();
+    uint64_t flags = irq_lock();
     __asm__ volatile ("mov %0, %%cr3" :: "r"(page_address(map, 1)));
-    irq_unlock();
+    irq_unlock(flags);
 }
 
 phys_addr_t mmu_get_map(void)

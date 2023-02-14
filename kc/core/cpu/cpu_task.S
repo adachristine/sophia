@@ -15,7 +15,7 @@ cpu_set_thread:
     *  the following are the parameters for switching tasks
     *   rdi: pointer to control block of thread being switched to 
     *   rsi: pointer to control block of the current thread
-    *   rdx: pointer to this cpu's task state segment esp0 field
+    *   rdx: pointer to this cpu's task state segment rsp0 field
     */
     // test for attempt to switch to same thread
     cmp %rdi,%rsi

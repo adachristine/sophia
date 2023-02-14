@@ -113,6 +113,53 @@ void set_ist(int vec, int ist_index)
     idt[vec].access |= ist_index & 0x7;
 }
 
+static void gdt_flush(uint16_t code_seg, uint16_t data_seg, uint16_t task_seg)
+{
+    __asm__ volatile
+        (
+         "pushf\n"
+         "cli\n"
+         "mov %w1, %%ds\n"
+         "mov %w1, %%es\n"
+         "mov %w1, %%fs\n"
+         "mov %w1, %%gs\n"
+         "mov %w1, %%ss\n"
+         // make a far return frame on the stack
+         // [ss] @rsp+8
+         // [rip] @rsp
+         "push %q0\n"
+         "lea .Lflush(%%rip), %%rax\n"
+         "push %%rax\n"
+         // far return, now we're in the code segment
+         // defined here.
+         "lretq\n"
+         ".Lflush:\n"
+         "ltr %w2\n"
+         "popf\n"
+         :
+         :
+            "r"(code_seg << 3),
+            "r"(data_seg << 3),
+            "r"(task_seg << 3)
+        );
+}
+
+static void gdt_load(struct dtr64 gdtr)
+{
+    __asm__ volatile
+        (   
+         // can't have interrupts during GDT reload
+         // but don't re-enable interrupts if they were already disabled
+         "pushf\n"
+         "cli\n"
+         "lgdt %0\n"
+         "popf\n"
+         // dependency on pre-boot GDT is now gone
+         :
+         : "m"(gdtr)
+        );
+}
+
 static void gdt_init(void)
 {   
     set_gdt(CODE_SUPER_SEG_INDEX, 0, (uint64_t)-1, CODE64_SUPER_SEG);
@@ -121,39 +168,10 @@ static void gdt_init(void)
     set_gdt(TASK_SEG_INDEX, (uint64_t)&tss, sizeof(tss) - 1, TASK64_SEG);
 
     struct dtr64 gdtr = {sizeof(gdt) - 1, (uint64_t)&gdt};
-
-    __asm__ volatile
-        (   
-         // can't have interrupts during GDT reload
-         // but don't re-enable interrupts if they were already disabled
-         "pushf\n"
-         "cli\n"
-         "lgdt %0\n"
-         "mov %w2, %%ds\n"
-         "mov %w2, %%es\n"
-         "mov %w2, %%fs\n"
-         "mov %w2, %%gs\n"
-         "mov %w2, %%ss\n"
-         // make a far return frame on the stack
-         // [ss] @rsp+8
-         // [rip] @rsp
-         "pushq %1\n"
-         "lea .Lflush(%%rip), %%rax\n"
-         "push %%rax\n"
-         // far return, now we're in the code segment
-         // defined here.
-         "lretq\n"
-         ".Lflush:\n"
-         "ltr %w3\n"
-         "popf\n"
-         // dependency on pre-boot GDT is now gone
-         :
-         : "m"(gdtr),
-        "i"(CODE_SUPER_SEG_INDEX << 3),
-        "r"(DATA_SEG_INDEX << 3),
-        "r"(TASK_SEG_INDEX << 3)
-            );
+    gdt_load(gdtr);
+    gdt_flush(CODE_SUPER_SEG_INDEX, DATA_SEG_INDEX, TASK_SEG_INDEX);
 }
+
 
 static void idt_init(void)
 {

@@ -61,6 +61,8 @@ static void idle_thread_entry(void)
 {
     kprintf("idle thread started\n");
     unlock_scheduler();
+    
+    __asm__ ("sti");
 
     while (true)
     {
@@ -171,20 +173,22 @@ void task_schedule(void)
     }
 }
 
+static uint64_t scheduler_flags;
+
 static void lock_scheduler(void)
 {
-    irq_lock();
+    scheduler_flags = irq_lock();
 }
 
 static void lock_preempt(void)
 {
-    irq_lock();
+    scheduler_flags = irq_lock();
     preempt_switch_count++;
 }
 
 static void unlock_scheduler(void)
 {
-    irq_unlock();
+    irq_unlock(scheduler_flags);
 }
 
 static void unlock_preempt(void)
@@ -201,7 +205,7 @@ static void unlock_preempt(void)
         task_schedule();
     }
 
-    irq_unlock();
+    irq_unlock(scheduler_flags);
 }
 
 void update_time(void)
