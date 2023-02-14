@@ -31,6 +31,12 @@ SECTIONS
         *(.dynstr)
     }
 
+    .rodata :
+    {
+        *(.rodata)
+        *(.rodata.*)
+    }
+
     .text : ALIGN(4K)
     {
         PROVIDE_HIDDEN(kc_text_begin = .);
@@ -63,7 +69,6 @@ SECTIONS
 
     .data :
     {
-        *(.rodata)
         *(.data)
     }
 

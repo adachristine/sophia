@@ -7,22 +7,18 @@ TARGET := kernel.os
 .DEFAULT: $(TARGET)
 
 CPPFLAGS += -I../../api -I../api -I../../lib -I.
-CFLAGS += -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
+CFLAGS += -mcmodel=small -Wno-unused-const-variable -Wno-unused-function -fvisibility=hidden -g
 
-SOBJS := 
-GOBJS := entry_x86_64.o reloc_x86_64.o dynamic_x86_64.o \
-	 kprintf.o serial.o port.o mmu.o kc_main.o memory.o memset.o memcpy.o \
-	 memmove.o memcmp.o cpu.o vm_tree.o exceptions.o panic.o msr.o task.o \
-	 cpu_task.o irq.o kcc_memory.o string.o pic8259.o pic8259_isr.o \
-	 pit8253.o page_early.o page_stack.o kstdio.o video.o i8042.o
-IOBJS :=
+AOBJS := entry_x86_64.o reloc_x86_64.o dynamic_x86_64.o
+COBJS := mmu.o cpu_task.o irq.o exceptions.o cpu.o msr.o mmu.o port.o
+POBJS := pic8259.o pic8259_isr.o pit8253.o i8042.o
+GOBJS := serial.o kc_main.o memory.o vm_tree.o panic.o task.o \
+	     kcc_memory.o page_early.o page_stack.o video.o
+LOBJS := kprintf.o memset.o memcpy.o memmove.o memcmp.o kstdio.o string.o
 
-# __attribute__((interrupt)) requires -mgeneral-regs-only
-$(GOBJS): CFLAGS += -mgeneral-regs-only
-$(GOBJS): CFLAGS += -mcmodel=small
-
-OBJS := $(SOBJS) $(GOBJS) $(IOBJS)
+OBJS := $(AOBJS) $(COBJS) $(POBJS) $(GOBJS) $(LOBJS)
 DEPS := $(patsubst %.o,%.d,$(OBJS))
+
 
 $(TARGET): $(LDSCRIPT) $(MAKEFILE_LIST)
 $(TARGET): $(OBJS)
