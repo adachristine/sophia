@@ -5,6 +5,7 @@
 #include "task.h"
 #include "memory.h"
 #include "descriptor.h"
+#include "irq.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -113,12 +114,11 @@ void set_ist(int vec, int ist_index)
     idt[vec].access |= ist_index & 0x7;
 }
 
-static void gdt_flush(uint16_t code_seg, uint16_t data_seg, uint16_t task_seg)
+static void gdt_flush(uint16_t code_seg, uint16_t data_seg)
 {
+    uint64_t rflags = irq_lock();
     __asm__ volatile
         (
-         "pushf\n"
-         "cli\n"
          "mov %w1, %%ds\n"
          "mov %w1, %%es\n"
          "mov %w1, %%fs\n"
@@ -134,30 +134,37 @@ static void gdt_flush(uint16_t code_seg, uint16_t data_seg, uint16_t task_seg)
          // defined here.
          "lretq\n"
          ".Lflush:\n"
-         "ltr %w2\n"
-         "popf\n"
          :
          :
             "r"(code_seg << 3),
-            "r"(data_seg << 3),
+            "r"(data_seg << 3)
+        );
+    irq_unlock(rflags);
+}
+
+static void gdt_load_task(uint16_t task_seg)
+{
+    uint64_t rflags = irq_lock();
+    __asm__ volatile
+        (
+         "ltr %w0\n"
+         :
+         :
             "r"(task_seg << 3)
         );
+    irq_unlock(rflags);
 }
 
 static void gdt_load(struct dtr64 gdtr)
 {
+    uint64_t rflags = irq_lock();
     __asm__ volatile
         (   
-         // can't have interrupts during GDT reload
-         // but don't re-enable interrupts if they were already disabled
-         "pushf\n"
-         "cli\n"
          "lgdt %0\n"
-         "popf\n"
-         // dependency on pre-boot GDT is now gone
          :
          : "m"(gdtr)
         );
+    irq_unlock(rflags);
 }
 
 static void gdt_init(void)
@@ -169,7 +176,8 @@ static void gdt_init(void)
 
     struct dtr64 gdtr = {sizeof(gdt) - 1, (uint64_t)&gdt};
     gdt_load(gdtr);
-    gdt_flush(CODE_SUPER_SEG_INDEX, DATA_SEG_INDEX, TASK_SEG_INDEX);
+    gdt_flush(CODE_SUPER_SEG_INDEX, DATA_SEG_INDEX);
+    gdt_load_task(TASK_SEG_INDEX);
 }
 
 
