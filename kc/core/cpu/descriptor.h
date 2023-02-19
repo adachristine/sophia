@@ -20,8 +20,10 @@ enum segment_descriptor_type
 {
     CODE64_SUPER_SEG,
     CODE64_USER_SEG,
-    DATA_SEG,
+    DATA_SUPER_SEG,
     TASK64_SEG,
+    CODE32_USER_SEG,
+    DATA_USER_SEG
 };
 
 struct gate_descriptor

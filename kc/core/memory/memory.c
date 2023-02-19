@@ -136,7 +136,9 @@ void page_free(kc_phys_addr page)
     page_stack_free(page);
 }
 
-static void *map_tableset(void *vaddr, uint64_t *tables[4])
+#define TABLESET_COUNT 3
+
+static void *map_tableset(void *vaddr, uint64_t *tables[TABLESET_COUNT])
 {
     uint64_t current_phys;
     uint64_t *current_pte;
@@ -144,8 +146,8 @@ static void *map_tableset(void *vaddr, uint64_t *tables[4])
     //
 
     current_phys = page_address(mmu_get_map(), 1);
-    tables[3] = temp_page_map(current_phys, CONTENT_RWDATA);
-    int n = 3;
+    tables[TABLESET_COUNT] = temp_page_map(current_phys, CONTENT_RWDATA);
+    int n = TABLESET_COUNT;
 
     while (n)
     {
@@ -185,6 +187,32 @@ static void *map_tableset(void *vaddr, uint64_t *tables[4])
     return vaddr;
 }
 
+void *page_set_flags(void *vaddr, enum page_map_flags flags)
+{
+    uint64_t *mapset[PAGE_MAP_LEVELS] = {NULL};
+
+    if (vaddr != map_tableset(vaddr, mapset))
+    {
+        PANIC(GENERAL_PANIC);
+    }
+
+    if (flags & PRIV_MASK)
+    {
+        mapset[3][pte_index(vaddr, 4)] |= PAGE_US;
+        mapset[2][pte_index(vaddr, 3)] |= PAGE_US;
+        mapset[1][pte_index(vaddr, 2)] |= PAGE_US;
+        mapset[0][pte_index(vaddr, 1)] |= PAGE_US;
+    }
+
+    for(int i = 0; i < PAGE_MAP_LEVELS; i++)
+    {
+        if (mapset[i])
+            temp_page_unmap(mapset[i]);
+    }
+
+    return vaddr;
+}
+
 static void *page_map_at(
         void *vaddr,
         phys_addr_t paddr,
@@ -192,7 +220,7 @@ static void *page_map_at(
 {
     // TODO: add checks to prevent attempts to map reserved addreses
     //
-    uint64_t *mapset[4] = {NULL};
+    uint64_t *mapset[PAGE_MAP_LEVELS] = {NULL};
 
     if (vaddr != map_tableset(vaddr, mapset))
     {
@@ -230,12 +258,18 @@ static void *page_map_at(
         default:
             vaddr = NULL;
     }
+
+    if (flags & PRIV_MASK)
+    {
+        entry |= PAGE_US;
+    }
+
     if (vaddr)
     {
         mapset[0][pte_index(vaddr, 1)] = page_address(paddr, 1) | entry;
     }
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < PAGE_MAP_LEVELS; i++)
     {
         if (mapset[i])
         {

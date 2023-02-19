@@ -15,10 +15,17 @@
 #define GDT_ENTRIES 16
 #define IDT_ENTRIES 256
 
-#define CODE_SUPER_SEG_INDEX 1
-#define CODE_USER_SEG_INDEX 2
-#define DATA_SEG_INDEX 3
-#define TASK_SEG_INDEX 4
+enum kernel_segment_indices
+{
+    NULL_SEG,
+    CODE64_SUPER_SEG_INDEX,
+    DATA_SUPER_SEG_INDEX,
+    CODE32_USER_SEG_INDEX,
+    DATA32_USER_SEG_INDEX,
+    CODE64_USER_SEG_INDEX,
+    DATA64_USER_SEG_INDEX,
+    TASK64_SEG_INDEX
+};
 
 #define EFER_SCE 1
 
@@ -27,6 +34,13 @@
 #define MSR_LSTAR 0xc0000082
 #define MSR_CSTAR 0xc0000083
 #define MSR_SFMASK 0xc0000084
+
+struct cpu_state
+{
+    struct segment_descriptor gdt[GDT_ENTRIES];
+    struct gate_descriptor idt[IDT_ENTRIES];
+    struct task64_segment tss;
+};
 
 static struct segment_descriptor gdt[GDT_ENTRIES];
 static struct gate_descriptor idt[IDT_ENTRIES];
@@ -64,10 +78,16 @@ static void set_gdt(int index,
             gdt[index].access = 0xfa;
             gdt[index].flags_limit16 |= 0xa0;
             break;
-        case DATA_SEG:
+        case CODE32_USER_SEG:
+            gdt[index].access = 0xfa;
+            gdt[index].flags_limit16 |= 0xc0;
+        case DATA_SUPER_SEG:
             gdt[index].access = 0x92;
             gdt[index].flags_limit16 |= 0xc0;
             break;
+        case DATA_USER_SEG:
+            gdt[index].access = 0xf2;
+            gdt[index].flags_limit16 |= 0xc0;
         case TASK64_SEG:
             gdt[index].access = 0x89;
             //TODO: make this cleaner i don't like it
@@ -130,8 +150,7 @@ static void gdt_flush(uint16_t code_seg, uint16_t data_seg)
          "push %q0\n"
          "lea .Lflush(%%rip), %%rax\n"
          "push %%rax\n"
-         // far return, now we're in the code segment
-         // defined here.
+         // far return, now we're in the provided code segment
          "lretq\n"
          ".Lflush:\n"
          :
@@ -162,41 +181,46 @@ static void gdt_load(struct dtr64 gdtr)
         (   
          "lgdt %0\n"
          :
-         : "m"(gdtr)
+         : 
+            "m"(gdtr)
         );
     irq_unlock(rflags);
 }
 
-static void gdt_init(void)
+static struct dtr64 gdt_init(void)
 {   
-    set_gdt(CODE_SUPER_SEG_INDEX, 0, (uint64_t)-1, CODE64_SUPER_SEG);
-    set_gdt(CODE_USER_SEG_INDEX, 0, (uint64_t)-1, CODE64_USER_SEG);
-    set_gdt(DATA_SEG_INDEX, 0, (uint64_t)-1, DATA_SEG);
-    set_gdt(TASK_SEG_INDEX, (uint64_t)&tss, sizeof(tss) - 1, TASK64_SEG);
+    set_gdt(CODE64_SUPER_SEG_INDEX, 0, (uint64_t)-1, CODE64_SUPER_SEG);
+    set_gdt(DATA_SUPER_SEG_INDEX, 0, (uint64_t)-1, DATA_SUPER_SEG);
+    set_gdt(CODE32_USER_SEG_INDEX, 0, (uint64_t)-1, CODE32_USER_SEG);
+    set_gdt(DATA32_USER_SEG_INDEX, 0, (uint64_t)-1, DATA_USER_SEG);
+    set_gdt(CODE64_USER_SEG_INDEX, 0, (uint64_t)-1, CODE64_USER_SEG);
+    set_gdt(DATA64_USER_SEG_INDEX, 0, (uint64_t)-1, DATA_USER_SEG);
+    set_gdt(TASK64_SEG_INDEX, (uint64_t)&tss, sizeof(tss) - 1, TASK64_SEG);
 
     struct dtr64 gdtr = {sizeof(gdt) - 1, (uint64_t)&gdt};
+
     gdt_load(gdtr);
-    gdt_flush(CODE_SUPER_SEG_INDEX, DATA_SEG_INDEX);
-    gdt_load_task(TASK_SEG_INDEX);
+    gdt_flush(CODE64_SUPER_SEG_INDEX, DATA_SUPER_SEG_INDEX);
+    gdt_load_task(TASK64_SEG_INDEX);
+
+    return gdtr;
 }
 
-
-static void idt_init(void)
+static struct dtr64 idt_init(void)
 {
     struct dtr64 idtr = {sizeof(idt) - 1, (uint64_t)&idt};
 
+    uint64_t rflags = irq_lock();
     __asm__ volatile
         (
-         // can't have interrupts enabled during IDT reload--obviously.
-         // as with GDT don't re-enable interrupts if they were already
-         // disabled.
-         "pushf\n"
-         "cli\n"
          "lidt %0\n"
-         "popf\n"
-         // much more straightforward than the gdt code.
-         :: "m"(idtr)
+         :
+         : 
+            "m"(idtr)
         );
+    irq_unlock(rflags);
+
+    return idtr;
 }
 
 void cpu_init(void)
@@ -207,7 +231,7 @@ void cpu_init(void)
 
     //TODO: fix rudimentary syscall stuff.
 
-    uint64_t lstar_bits = (uintptr_t)syscall_entry;
+    uintptr_t lstar_bits = (uintptr_t)syscall_entry;
     msr_write(MSR_LSTAR, lstar_bits);
 
     union
@@ -215,10 +239,8 @@ void cpu_init(void)
         struct
         {
             uint32_t eip32;
-            uint8_t syscall_ss;
-            uint8_t syscall_cs;
-            uint8_t sysret_ss;
-            uint8_t sysret_cs;
+            uint16_t syscall_cs;
+            uint16_t sysret_cs;
         }
         fields;
         uint64_t raw;
@@ -227,10 +249,8 @@ void cpu_init(void)
     {
         {
             0,
-            DATA_SEG_INDEX,
-            CODE_SUPER_SEG_INDEX,
-            DATA_SEG_INDEX,
-            CODE_USER_SEG_INDEX
+            CODE64_SUPER_SEG_INDEX << 3,
+            CODE32_USER_SEG_INDEX << 3 | 3
         }
     };
 
@@ -253,15 +273,10 @@ void exceptions_init(void)
 
 void isr_install(int vec, void (*isr)(void), int trap, unsigned ist)
 {
-    enum gate_descriptor_type type = INT64_GATE;
+    enum gate_descriptor_type type = trap ? TRAP64_GATE : INT64_GATE;
 
-    if (trap)
-    {
-        type = TRAP64_GATE;
-    }
+    set_idt(vec, CODE64_SUPER_SEG_INDEX << 3, (uintptr_t)isr, type);
 
-    set_idt(vec, CODE_SUPER_SEG_INDEX << 3, (uintptr_t)isr, type);
-    // an IST greater than 7 is invalid 
     if (ist && ist <= 7)
     {
         set_ist(vec, ist);
@@ -275,15 +290,5 @@ void isr_install(int vec, void (*isr)(void), int trap, unsigned ist)
 void ist_install(int ist, void *stack)
 {
     tss.ist[ist] = (uintptr_t)stack;
-}
-
-void int_enable(void)
-{
-    __asm__ ("sti");
-}
-
-void int_disable(void)
-{
-    __asm__ ("cli");
 }
 

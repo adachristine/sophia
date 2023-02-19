@@ -19,10 +19,13 @@ enum page_map_flags
     CONTENT_RWDATA = 0x3,
     CONTENT_MASK = 0x3,
     
-    SIZE_4K = 0x4,
-    SIZE_2M = 0x8,
-    SIZE_1G = 0xc,
-    SIZE_MASK = 0xc,
+    PRIV_USER = 0x4,
+    PRIV_MASK = 0x4,
+
+    SIZE_4K = 0x8,
+    SIZE_2M = 0x10,
+    SIZE_1G = 0x18,
+    SIZE_MASK = 0x18,
 };
 
 enum page_alloc_flags
@@ -60,6 +63,7 @@ int page_inc_ref(kc_phys_addr page);
 int page_dec_ref(kc_phys_addr page); 
 
 void *page_map(phys_addr_t paddr, enum page_map_flags flags);
+void *page_set_flags(void *vaddr, enum page_map_flags flags);
 void page_unmap(void *vaddr);
 
 phys_addr_t page_alloc(enum page_alloc_flags flags);
