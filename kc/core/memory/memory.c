@@ -26,6 +26,7 @@
 
 static void *temp_page_map(kc_phys_addr paddr, enum page_map_flags flags);
 static void temp_page_unmap(void *address);
+static kc_phys_addr boot_page_alloc(enum page_alloc_flags type);
 
 static void *page_map_at(
         void *vaddr,
@@ -79,6 +80,8 @@ static struct vm_temp_state
 }
 temp_state;
 
+static kc_phys_addr (*current_alloc_func)(enum page_alloc_flags) = boot_page_alloc;
+
 struct vm_tree *vm_get_tree(void)
 {
     return &vm_state.tree;
@@ -93,10 +96,13 @@ void page_init(void)
 
 void page_init_final(void)
 {
-    kprintf("finishing page frame allocator initialization\n");
-    page_early_final();
+    if (current_alloc_func == boot_page_alloc)
+    {
+        kprintf("finishing page frame allocator initialization\n");
+        page_early_final();
+        current_alloc_func = page_stack_alloc;
+    }
 }
-
 
 void page_set_present(kc_phys_addr page)
 {
@@ -118,17 +124,21 @@ void page_set_free(kc_phys_addr page)
     page_stack_set_free(page);
 }
 
-kc_phys_addr page_alloc(enum page_alloc_flags type)
+static kc_phys_addr boot_page_alloc(enum page_alloc_flags type)
 {
-    kc_phys_addr paddr = 0;
-    if ((paddr = page_stack_alloc(type)) > 0)
-    {
-        return paddr;
-    }
-    else
+    kc_phys_addr paddr = page_stack_alloc(type);
+
+    if (paddr == 0)
     {
         return page_early_alloc(type);
     }
+
+    return paddr;
+}
+
+kc_phys_addr page_alloc(enum page_alloc_flags type)
+{
+    return current_alloc_func(type);
 }
 
 void page_free(kc_phys_addr page)
