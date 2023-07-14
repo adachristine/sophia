@@ -19,6 +19,17 @@ void page_early_init(void)
     early_state.first = &boot_data->memory.entries[0];
     early_state.last = &boot_data->memory.entries[boot_data->memory.count];
     early_state.current = early_state.first;
+
+    kprintf("memory ranges\n");
+
+    struct memory_range *current = early_state.first;
+
+    do
+    {
+        kprintf("base %#0.16lx size %#0.16lx type %d\n", current->base, current->size, current->type);
+        current++;
+    }
+    while (current != early_state.last);
 }
 
 void page_early_final(void)
@@ -30,7 +41,7 @@ void page_early_final(void)
                 current < early_state.last;
                 current++)
         {
-            while (current->size >= page_size(1))
+            while (current->type != RESERVED_MEMORY && current->size >= page_size(1))
             {
                 current->size -= page_size(1);
 
@@ -44,7 +55,6 @@ void page_early_final(void)
 
                 switch (type)
                 {
-                    case RESERVED_MEMORY:
                     case SYSTEM_MEMORY:
                         page_set_present(page);
                         break;

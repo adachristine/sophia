@@ -219,7 +219,7 @@ static void collect_video_data(void)
 
         boot_data.video = (struct kc_boot_video_data){
             {
-                RESERVED_MEMORY,
+                MMIO_MEMORY,
                     mode->FrameBufferBase,
                     mode->FrameBufferSize
             },

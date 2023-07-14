@@ -43,6 +43,7 @@ static void wait(void)
 
 void pic8259_init(void)
 {
+    kprintf("initializing legacy pic\n");
     // basic init. not gonna fret with this too much
     outb(PIC_PRI_CMD, ICW1_INIT|ICW1_ICW4);
     wait();
