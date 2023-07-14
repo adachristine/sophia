@@ -17,12 +17,12 @@ LDFLAGS := --target=$(GNUEFIARCH)-unknown-windows -nostdlib -ggdb \
 all: $(IMAGE)
 
 OBJS := main_efi.o elf64.o memcmp.o memmove.o kprintf.o string.o memset.o \
-	memcpy.o
+		memcpy.o
 DEPS := $(OBJS:.o=.d)
 
 $(IMAGE): $(OBJS)
 
-CLEANLIST := $(wildcard $(BUILD) $(OBJS)) $(IMAGE:.efi=.pdb)
+CLEANLIST := $(wildcard $(BUILD) $(OBJS) $(IMAGE) $(IMAGE:.efi=.pdb))
 DCLEANLIST := $(CLEANLIST) $(wildcard $(DEPS))
 
 include ../rules.mk
