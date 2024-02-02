@@ -20,7 +20,7 @@ void page_early_init(void)
     early_state.last = &boot_data->memory.entries[boot_data->memory.count];
     early_state.current = early_state.first;
 
-    kprintf("memory ranges\n");
+    /*kprintf("memory ranges\n");
 
     struct memory_range *current = early_state.first;
 
@@ -30,6 +30,7 @@ void page_early_init(void)
         current++;
     }
     while (current != early_state.last);
+	*/
 }
 
 void page_early_final(void)

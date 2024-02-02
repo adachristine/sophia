@@ -587,7 +587,7 @@ void *vm_alloc_at(void *address, size_t size, enum vm_alloc_flags flags)
                 node,
                 object,
                 address,
-                (void *)((char *)address + size));
+                (char *)address + size);
     }
     
     return address;

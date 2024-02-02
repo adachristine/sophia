@@ -465,9 +465,9 @@ static EFI_STATUS enter_shim(void)
 {
     EFI_STATUS status = EFI_ABORTED;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)shim_image.buffer_base;
-    efi_shim_entry_func entry;
+    efi_shim_entry_func *entry;
 
-    entry = (efi_shim_entry_func)(shim_image.buffer_base + ehdr->e_entry);
+    entry = (efi_shim_entry_func *)(shim_image.buffer_base + ehdr->e_entry);
     kprintf("entering shim @%p\r\n", entry);
 
     status = entry(&loader_interface);
