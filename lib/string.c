@@ -1,13 +1,44 @@
-#include <lib/kstring.h>
+#include <libc/string.h>
 #include <stdbool.h>
 
 size_t strlen(const char *s)
 {
     size_t l = 0;
 
-    while (*s++) l++;
+    while (s != nullptr && *s++) l++;
 
     return l;
+}
+
+size_t wcslen(const wchar_t *s)
+{
+	size_t l = 0;
+
+	while (s != nullptr && *s++) l++;
+
+	return l;
+}
+
+size_t mbstowcs(wchar_t *dst, const char *src, size_t len)
+{
+	if (dst == nullptr || src == nullptr)
+	{
+		return -1;
+	}
+
+	size_t i;
+
+	for (i = 0; i < len; i++)
+	{
+		if ((dst[i] = src[i]) == 0)
+		{
+			break;
+		}
+	}
+
+	dst[i] = L'\0';
+
+	return i;
 }
 
 static long long valueof(int c, int base)
@@ -28,9 +59,7 @@ static long long valueof(int c, int base)
     }
 
     // check if value is an uppercase ASCII alphabetical character
-    else if (
-            (c >= 'A' && c <= 'Z') ||
-            (c >= 'a' && c <= 'z'))
+    else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
     {
         // mask in uppercase bit
         c |= 0x20;

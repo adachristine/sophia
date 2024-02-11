@@ -599,13 +599,32 @@ void *vm_alloc(size_t size, enum vm_alloc_flags flags)
     // TODO implement a proper allocator here rather than this bump allocator.
     char *address = vm_state.first_free;
 
-    if (address == vm_alloc_at(address, size, flags))
-    {
-        vm_state.first_free = address + size;
-        return address;
-    }
+	while (address != vm_alloc_at(address, size, flags))
+	{
+		address = address + size;
+	}
 
-    return NULL;
+	if (address != nullptr)
+	{
+		vm_state.first_free = address + size;
+	}
+
+    return address;
+}
+
+
+void vm_free(void *address)
+{
+	struct vm_tree_key key = { (uintptr_t)address, 1 };
+	struct vm_tree_node *node;
+
+	if(!(node = vmt_search_key(vm_get_tree(), &key)))
+	{
+		return;
+	}
+
+	// TODO: delete paging structures etc.
+	vmt_delete(vm_get_tree(), node);
 }
 
 int anonymous_page_handler(
