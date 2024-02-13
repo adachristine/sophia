@@ -1,7 +1,7 @@
 include ../defaults.mk
 include ../efi.mk
 
-VPATH := ../lib
+VPATH := ../lib efi/
 
 IMAGE := kjarna.efi
 
@@ -18,9 +18,10 @@ all: $(IMAGE)
 
 CRT_OBJS := start.o
 LIB_OBJS := memcmp.o memset.o memcpy.o memmove.o string.o elf64.o
-APP_OBJS := file.o memory.o protocol.o runtime.o
+EFI_OBJS := file.o memory.o protocol.o runtime.o
+APP_OBJS := main.o
 
-OBJS := $(CRT_OBJS) $(LIB_OBJS) $(APP_OBJS)
+OBJS := $(CRT_OBJS) $(LIB_OBJS) $(EFI_OBJS) $(APP_OBJS)
 DEPS := $(OBJS:.o=.d)
 
 $(IMAGE): $(OBJS)

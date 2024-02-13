@@ -5,7 +5,7 @@
 #include <efi/types.h>
 #include <efi/tables.h>
 
-#include <kjarna/interface.h>
+#include "../kjarna.h"
 
 struct efi_context
 {
@@ -33,6 +33,4 @@ int SYSV_ABI efi_munmap(void *addr, size_t length);
 void *efi_alloc_pool(size_t size);
 void *efi_calloc_pool(size_t count, size_t size);
 void efi_free_pool(void *block);
-
-int runtime_start(void);
 
