@@ -124,6 +124,7 @@ static struct runtime_buffer load_runtime(void)
 		buffer.base = nullptr;
 	}
 
+	efi_close(runtime_fd);
 	efi_free_pool(phdrs);
 
 	return buffer;

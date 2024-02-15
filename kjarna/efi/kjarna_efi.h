@@ -20,6 +20,7 @@ extern EFI_STATUS efi_errno;
 #define gBS efi_context->system_table->BootServices
 
 void *efi_get_protocol(EFI_HANDLE handle, EFI_GUID *guid);
+void efi_close_protocol(EFI_HANDLE handle, EFI_GUID *guid);
 
 int SYSV_ABI efi_open(const char *path, int flags, int mode);
 int SYSV_ABI efi_close(int fd);

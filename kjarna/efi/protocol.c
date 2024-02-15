@@ -22,3 +22,12 @@ void *efi_get_protocol(EFI_HANDLE handle, EFI_GUID *guid)
 	return protocol;
 }
 
+void efi_close_protocol(EFI_HANDLE handle, EFI_GUID *guid)
+{
+	efi_errno = gBS->CloseProtocol(
+			handle,
+			guid,
+			efi_context->handle,
+			nullptr);
+}
+

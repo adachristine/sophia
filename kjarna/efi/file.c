@@ -66,32 +66,17 @@ static void free_fd(int fd)
 
 int efi_open(const char *path, int flags, int mode)
 {
-	EFI_GUID lip_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
-	EFI_LOADED_IMAGE_PROTOCOL *lip = nullptr;
-
-	efi_errno = gBS->OpenProtocol(
-			efi_context->handle,
-			&lip_guid,
-			(void **)&lip,
-			efi_context->handle,
-			nullptr,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	static EFI_GUID lip_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+	static EFI_GUID sfsp_guid = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
+		
+	EFI_LOADED_IMAGE_PROTOCOL *lip = efi_get_protocol(efi_context->handle, &lip_guid);
 
 	if (lip == nullptr)
 	{
 		return -1;
 	}
 
-	EFI_GUID sfsp_guid = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
-	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *sfsp = nullptr;
-
-	efi_errno = gBS->OpenProtocol(
-			lip->DeviceHandle,
-			&sfsp_guid,
-			(void **)&sfsp,
-			efi_context->handle,
-			nullptr,
-			EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *sfsp = efi_get_protocol(lip->DeviceHandle, &sfsp_guid);
 
 	if (sfsp == nullptr)
 	{
@@ -117,7 +102,7 @@ int efi_open(const char *path, int flags, int mode)
 	size_t path_len = strlen(path) + 1;
 	CHAR16 *wcpath = efi_calloc_pool(path_len, sizeof(*wcpath));
 
-	if(mbstowcs(wcpath, path, path_len) == (size_t)-1)
+	if (mbstowcs(wcpath, path, path_len) == (size_t)-1)
 	{
 		efi_errno = EFI_INVALID_PARAMETER;
 	}
@@ -131,6 +116,8 @@ int efi_open(const char *path, int flags, int mode)
 				0);
 	}
 
+	efi_close_protocol(lip->DeviceHandle, &lip_guid);
+	efi_close_protocol(efi_context->handle, &sfsp_guid);
 	efi_free_pool(wcpath);
 
 	(void)flags;
