@@ -3,5 +3,5 @@
 #include <kjarna/interface.h>
 
 int main(int argc, char **argv);
-int runtime_start(void);
+int image_start(void);
 

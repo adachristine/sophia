@@ -18,7 +18,7 @@ all: $(IMAGE)
 
 CRT_OBJS := start.o
 LIB_OBJS := memcmp.o memset.o memcpy.o memmove.o string.o elf64.o
-EFI_OBJS := file.o memory.o protocol.o runtime.o
+EFI_OBJS := file.o memory.o protocol.o image.o
 APP_OBJS := main.o
 
 OBJS := $(CRT_OBJS) $(LIB_OBJS) $(EFI_OBJS) $(APP_OBJS)

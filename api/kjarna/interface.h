@@ -25,5 +25,5 @@ struct kjarna_entry_params
 	char **envp;
 };
 
-typedef int (SYSV_ABI kjarna_runtime_entry_func)(struct kjarna_entry_params *);
+typedef int (SYSV_ABI kjarna_image_entry_func)(struct kjarna_entry_params *);
 
