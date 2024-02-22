@@ -89,7 +89,7 @@ static ssize_t load_segments(int fd, Elf64_Ehdr *ehdr, Elf64_Phdr *phdrs, char *
 
 static struct image_buffer load_image(void)
 {
-	const char *image_entry_path = "\\adasoft\\sophia\\efi.os";
+	const char *image_entry_path = "\\adasoft\\sophia\\kjarna.os";
 
 	int image_fd;
 

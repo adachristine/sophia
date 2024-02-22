@@ -1,5 +1,13 @@
-#include <libc/string.h>
+#include <libc/string.h> 
 #include <stdbool.h>
+
+int strcmp(const char *s1, const char *s2)
+{
+	size_t s1len = strlen(s1);
+	size_t s2len = strlen(s2);
+
+	return memcmp(s1, s2, s1len < s2len ? s1len : s2len);
+}
 
 size_t strlen(const char *s)
 {

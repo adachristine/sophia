@@ -1,5 +1,4 @@
 
-LDSCRIPT := ../kc.ld
 
 CFLAGS += -fPIC -fvisibility=hidden -mgeneral-regs-only
 

@@ -7,5 +7,6 @@ void *memmove(void *dest, const void *src, size_t size);
 void *memset(void *dest, int val, size_t size);
 int memcmp(const void *str1, const void *str2, size_t count);
 size_t strlen(const char *s);
+int strcmp(const char *s1, const char *s2);
 unsigned long long strtoull(const char *restrict begin, char **restrict end, int base);
 

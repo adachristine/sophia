@@ -81,4 +81,5 @@ typedef uint8_t Elf_Byte;
 #define DT_STRSZ 10
 #define DT_SYMENT 11
 #define DT_JMPREL 0x17
+#define DT_PLTREL 20
 
