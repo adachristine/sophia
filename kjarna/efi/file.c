@@ -145,12 +145,6 @@ int efi_close(int fd)
 
 off_t efi_lseek(int fd, off_t offset, int whence)
 {
-	if (whence != SEEK_SET)
-	{
-		efi_errno = EFI_INVALID_PARAMETER;
-		return -1;
-	}
-
 	EFI_FILE_PROTOCOL *file = fd_to_file(fd);
 
 	if (file == nullptr)
@@ -159,13 +153,36 @@ off_t efi_lseek(int fd, off_t offset, int whence)
 		return -1;
 	}
 
-	efi_errno = file->SetPosition(file, (UINTN)offset);
+	off_t current = 0;
+
+	if (whence == SEEK_END)
+	{
+		efi_errno = file->SetPosition(file, (UINTN)-1);
+	}
+
+	if (EFI_ERROR(efi_errno))
+	{
+		return -1;
+	}
+
+	if (whence == SEEK_CUR || whence == SEEK_END)
+	{
+		efi_errno = file->GetPosition(file, (UINTN *)&current);
+	}
+
+	if (EFI_ERROR(efi_errno))
+	{
+		return -1;
+	}
+
+	efi_errno = file->SetPosition(file, (UINTN)(offset + current));
 
 	return !EFI_ERROR(efi_errno) ? offset : -1;
 }
 
 static ssize_t efi_console_read(EFI_SIMPLE_TEXT_INPUT_PROTOCOL *console, CHAR16 *buffer, size_t length)
 {
+	//TODO: implement user input
 	(void)console;
 	(void)buffer;
 	efi_errno = EFI_INVALID_PARAMETER;

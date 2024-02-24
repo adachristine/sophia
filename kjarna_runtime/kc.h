@@ -21,10 +21,11 @@ extern unsigned char kc_data_end;
 extern unsigned char kc_image_end;
 
 struct elf64_dso_info;
+struct elf64_relatab;
 
 extern void kc_dynamic_init(char *base, Elf64_Dyn *dyn);
 extern void *kc_dynamic_link(struct elf64_dso_info *dso, int index);
-extern void kc_reloc(void *base, Elf64_Rela *entries, size_t size, size_t entsize);
+extern void kc_dynamic_reloc(char *base, struct elf64_relatab *dso);
 
 #else
 

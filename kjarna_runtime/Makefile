@@ -15,7 +15,7 @@ CFLAGS += -fPIC -fvisibility=hidden -mgeneral-regs-only
 
 LDSCRIPT := kc.ld
 
-CRT_OBJS := start_x86_64.o reloc_x86_64.o dynamic_x86_64.o elf64.o
+CRT_OBJS := start_x86_64.o dynamic_x86_64.o elf64.o
 LIB_OBJS := memcmp.o memcpy.o memmove.o memset.o string.o
 APP_OBJS := kc_main.o
 

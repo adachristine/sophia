@@ -6,6 +6,8 @@
 
 enum seek_whence
 {
-	SEEK_SET
+	SEEK_SET,
+	SEEK_CUR,
+	SEEK_END
 };
 
