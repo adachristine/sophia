@@ -233,7 +233,8 @@ static ssize_t efi_console_write(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *console, const
 	}
 	else
 	{
-		ws[length] = L'\r';
+		if (ws[length - 1] == L'\n')
+			ws[length] = L'\r';
 		efi_errno = console->OutputString(console, ws);
 	}
 
