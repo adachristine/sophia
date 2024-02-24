@@ -129,9 +129,9 @@ static void do_rela(char *base, Elf64_Rela *rela)
 
 void kc_dynamic_reloc(char *base, struct elf64_relatab *rela)
 {
-    // perform the actual relocation
+	size_t entries = rela->size / rela->entsize;
 
-    for (size_t i = 0; rela->entries && (i < rela->size); i += rela->entsize)
+    for (size_t i = 0; rela->entries && (i < entries); i++)
     {
         do_rela(base, &rela->entries[i]);
     }

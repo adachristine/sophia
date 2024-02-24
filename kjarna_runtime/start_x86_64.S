@@ -21,7 +21,7 @@ _start:
     pop %rdi
     mov %rsp, %rbp
     and $-0x10, %rsp
-	call kjarna_entry
+    call kjarna_entry
     mov %rbp, %rsp
     pop %rbp
     ret
@@ -33,31 +33,31 @@ _start:
 .global _rtld_link
 .type _rtld_link, @function
 _rtld_link:
-	push %rbp
-	mov %rsp, %rbp
-	push %r9
-	push %r8
-	push %rcx
-	push %rdx
-	push %rsi
-	push %rdi
-	mov 8(%rbp), %rdi
-	mov 16(%rbp), %rsi
-	push %rbp
-	mov %rsp, %rbp
-	and $-0x10, %rsp
-	call kc_dynamic_link
-	mov %rbp, %rsp
-	pop %rbp
-	pop %rdi
-	pop %rsi
-	pop %rdx
-	pop %rcx
-	pop %r8
-	pop %r9
-	mov %rbp, %rsp
-	pop %rbp
-	add $0x10, %rsp
-	jmp *(%rax)
+    push %rbp
+    mov %rsp, %rbp
+    push %r9
+    push %r8
+    push %rcx
+    push %rdx
+    push %rsi
+    push %rdi
+    mov 8(%rbp), %rdi
+    mov 16(%rbp), %rsi
+    push %rbp
+    mov %rsp, %rbp
+    and $-0x10, %rsp
+    call kc_dynamic_link
+    mov %rbp, %rsp
+    pop %rbp
+    pop %rdi
+    pop %rsi
+    pop %rdx
+    pop %rcx
+    pop %r8
+    pop %r9
+    mov %rbp, %rsp
+    pop %rbp
+    add $0x10, %rsp
+    jmp *(%rax)
 .size _rtld_link, . - _rtld_link
 

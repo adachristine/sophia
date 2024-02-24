@@ -1,11 +1,12 @@
 #include <unistd.h>
+#include <stdio.h>
 
 int main(int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
 
-	write(1, "hello, runtime world!\r\n", -1);
+	fputs("hello, runtime world!\n", stdout);
 
 	while (1);
 
