@@ -225,14 +225,15 @@ static ssize_t efi_console_write(EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *console, const
 		length = strlen(buffer);
 	}
 
-	wchar_t *ws = efi_calloc_pool(length + 1, sizeof(*ws));
+	wchar_t *ws = efi_calloc_pool(length + 2, sizeof(*ws));
 
-	if(mbstowcs(ws, buffer, length + 1) == (size_t)-1)
+	if(mbstowcs(ws, buffer, length + 2) == (size_t)-1)
 	{
 		efi_errno = EFI_INVALID_PARAMETER;
 	}
 	else
 	{
+		ws[length] = L'\r';
 		efi_errno = console->OutputString(console, ws);
 	}
 
