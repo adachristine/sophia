@@ -1,5 +1,8 @@
 include ../defaults.mk
-include ../efi.mk
+
+%.efi: 
+	$(CC.info)
+	@$(CC) $(LDFLAGS) -o $@ $^
 
 VPATH := ../lib efi/
 
@@ -7,11 +10,11 @@ IMAGE := kjarna.efi
 
 CPPFLAGS += -I../api -I../lib
 
-CFLAGS += --target=$(GNUEFIARCH)-unknown-windows -fshort-wchar -mno-avx \
+CFLAGS += --target=$(ARCH)-unknown-windows -fshort-wchar -mno-avx \
 	  -mno-sse -mno-mmx -funsigned-char -Wno-pointer-sign -ggdb \
 	  -fno-ms-extensions
 
-LDFLAGS := --target=$(GNUEFIARCH)-unknown-windows -nostdlib -ggdb \
+LDFLAGS := --target=$(ARCH)-unknown-windows -nostdlib -ggdb \
 	   -Wl,-entry:_start,-subsystem:efi_application -fuse-ld=lld-link
 
 all: $(IMAGE)
