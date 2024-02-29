@@ -19,6 +19,8 @@ EFI_STATUS _start(EFI_HANDLE handle, EFI_SYSTEM_TABLE *system_table)
 	struct efi_context app_context = { handle, system_table };
 	efi_context = &app_context;
 
+	system_table->ConOut->ClearScreen(system_table->ConOut);
+
 	if (main(0, nullptr) != 0)
 	{
 		efi_errno = EFI_ABORTED;
