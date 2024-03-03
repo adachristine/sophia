@@ -64,6 +64,16 @@ static void free_fd(int fd)
 	}
 }
 
+CHAR16 *swap_path_separator(CHAR16 *path)
+{
+	for (CHAR16 *r = path; *r != '\0'; r++)
+	{
+		*r = *r == L'/' ? '\\' : *r;
+	}
+
+	return path;
+}
+
 int efi_open(const char *path, int flags, int mode)
 {
 	static EFI_GUID lip_guid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
@@ -108,6 +118,8 @@ int efi_open(const char *path, int flags, int mode)
 	}
 	else
 	{
+		wcpath = swap_path_separator(wcpath);
+
 		efi_errno = root->Open(
 				root, 
 				&open_files[fd], 

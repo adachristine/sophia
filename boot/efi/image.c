@@ -6,6 +6,8 @@
 
 #include "kjarna_efi.h"
 
+#include "config.h"
+
 #include <efi/error.h>
 
 struct image_buffer
@@ -89,7 +91,7 @@ static ssize_t load_segments(int fd, Elf64_Ehdr *ehdr, Elf64_Phdr *phdrs, char *
 
 static struct image_buffer load_image(void)
 {
-	const char *image_entry_path = "\\adasoft\\sophia\\kjarna.os";
+	const char *image_entry_path = SERVICE_FILE_PATH;
 
 	int image_fd;
 
