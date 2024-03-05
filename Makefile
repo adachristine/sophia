@@ -1,5 +1,3 @@
-.PHONY: all clean $(DIRS_CLEAN)
-
 BOOT_DIR := boot
 BOOT_FILE := $(BOOT_DIR)/kjarna.efi
 
@@ -10,10 +8,9 @@ TARGETS := $(SERVICE_FILE) $(BOOT_FILE)
 DIRS := $(SERVICE_DIR) $(BOOT_DIR)
 
 DIRS_CLEAN := $(addprefix clean-,$(DIRS))
-DIRS_DISTCLEAN := $(addprefix distclean-,$(DIRS))
+DIRS_DISTCLEAN := $(addprefix dist,$(DIRS_CLEAN))
 
 all: $(TARGETS)
-
 clean: $(DIRS_CLEAN)
 distclean: $(DIRS_DISTCLEAN)
 
@@ -26,4 +23,5 @@ $(DIRS_DISTCLEAN): distclean-%:
 $(TARGETS):
 	$(MAKE) -C $(dir $@)
 
+.PHONY: all clean distclean $(DIRS) $(DIRS_CLEAN) $(DIRS_DISTCLEAN)
 
